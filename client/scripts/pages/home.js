@@ -66,12 +66,16 @@ const HomePage = (function () {
             </div>
             <div id="home-loading" class="loading-overlay hidden">
                 <div class="loading-panel">
-                    <div id="home-loading-tip" class="loading-tip"></div>
-                    <div id="home-loading-checklist" class="loading-checklist"></div>
-                    <div class="loading-progress-bar-container">
-                        <div id="home-loading-bar" class="loading-progress-bar"></div>
+                    <div id="home-loading-checklist" class="loading-checklist">
+                        <div class="loading-step" id="hl-step-0">
+                            <div class="loading-step-icon"></div>
+                            <span>${t('stepCheck') || 'Проверка темы'}</span>
+                        </div>
+                        <div class="loading-step" id="hl-step-1">
+                            <div class="loading-step-icon"></div>
+                            <span>${t('stepGenerate') || 'Генерация дерева'}</span>
+                        </div>
                     </div>
-                    <div id="home-loading-percent" class="loading-percent">0%</div>
                 </div>
             </div>
         `;
@@ -261,12 +265,29 @@ const HomePage = (function () {
         subtitle.style.opacity = '1';
 
         showLoading();
-        startLoadingAnimation();
 
         try {
+            // Шаг 1: проверка темы
+            setStepState(0, 'active');
+            var check = await API.post('/api/generate/check', { topic: topic }, { timeout: 30000 });
+            if (!check.valid) {
+                setStepState(0, 'error');
+                await delay(600);
+                hideLoading();
+                Toast.show(t('topicInvalid') + ': ' + (check.reason || t('topicInvalidDefault')), 'error');
+                subtitle.textContent = t('homeSubtitle');
+                startHints();
+                btn.disabled = false;
+                return;
+            }
+            setStepState(0, 'done');
+
+            // Шаг 2: генерация
+            setStepState(1, 'active');
             var graphData = await API.post('/api/generate', { topic: topic }, { timeout: 600000 });
-            finishLoadingAnimation();
-            await new Promise(function (r) { setTimeout(r, 400); });
+            setStepState(1, 'done');
+            await delay(400);
+
             if (!graphData.nodes || graphData.nodes.length < 2) {
                 throw new Error(t('tooFewData'));
             }
@@ -353,69 +374,20 @@ const HomePage = (function () {
        Loading
        ============================================ */
 
+    function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
     function showLoading() {
-        var t = I18n.t;
         var el = document.getElementById('home-loading');
         el.classList.remove('hidden');
-        var bar = document.getElementById('home-loading-bar');
-        bar.style.width = '0%';
-        bar.classList.remove('waiting');
-        document.getElementById('home-loading-percent').textContent = '0%';
-
-        var cl = document.getElementById('home-loading-checklist');
-        cl.innerHTML = '';
-        var steps = [t('step0'), t('step1'), t('step2'), t('step3'), t('step4'), t('step5'), t('step6')];
-        steps.forEach(function (text, i) {
-            cl.innerHTML += '<div class="loading-check-item" id="hl-step-' + i + '">' +
-                '<div class="loading-check-spinner"></div>' +
-                '<div class="loading-check-circle"><span class="loading-check-mark">\u2713</span></div>' +
-                '<span class="loading-check-text">' + text + '</span></div>';
-        });
-
-        var tips = [t('tip0'), t('tip1'), t('tip2'), t('tip3'), t('tip4')];
-        document.getElementById('home-loading-tip').textContent = tips[Math.floor(Math.random() * tips.length)];
+        setStepState(0, 'pending');
+        setStepState(1, 'pending');
     }
 
-    function startLoadingAnimation() {
-        var bar = document.getElementById('home-loading-bar');
-        bar.classList.add('waiting');
-        var currentStep = 0;
-        var steps = 7;
-
-        function advanceStep() {
-            var el = document.getElementById('hl-step-' + currentStep);
-            if (!el) return;
-            if (currentStep > 0) {
-                var prev = document.getElementById('hl-step-' + (currentStep - 1));
-                if (prev) { prev.classList.remove('active'); prev.classList.add('done'); }
-            }
-            el.classList.add('active');
-            bar.style.width = Math.round((currentStep / steps) * 100) + '%';
-            document.getElementById('home-loading-percent').textContent = Math.round((currentStep / steps) * 100) + '%';
-            currentStep++;
-            if (currentStep < steps) {
-                var delay = currentStep === 1 ? 800 + Math.random() * 400 : 400 + Math.random() * 600;
-                loadingAnimFrame = setTimeout(advanceStep, delay);
-            }
-        }
-        loadingAnimFrame = setTimeout(advanceStep, 100);
-    }
-
-    function finishLoadingAnimation() {
-        if (loadingAnimFrame) { clearTimeout(loadingAnimFrame); loadingAnimFrame = null; }
-        var bar = document.getElementById('home-loading-bar');
-        if (bar) bar.classList.remove('waiting');
-        var steps = 7, i = 0;
-        function markDone() {
-            if (i >= steps) { if (bar) bar.style.width = '100%'; var p = document.getElementById('home-loading-percent'); if (p) p.textContent = '100%'; return; }
-            var el = document.getElementById('hl-step-' + i);
-            if (el) { el.classList.remove('active'); el.classList.add('done'); }
-            if (bar) bar.style.width = Math.round(((i + 1) / steps) * 100) + '%';
-            var p = document.getElementById('home-loading-percent'); if (p) p.textContent = Math.round(((i + 1) / steps) * 100) + '%';
-            i++;
-            setTimeout(markDone, 60);
-        }
-        markDone();
+    function setStepState(index, state) {
+        var el = document.getElementById('hl-step-' + index);
+        if (!el) return;
+        el.classList.remove('pending', 'active', 'done', 'error');
+        el.classList.add(state);
     }
 
     function hideLoading() {
