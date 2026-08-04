@@ -1,4 +1,4 @@
-/* home.js — главная страница с sidebar и ghost-анимациями */
+/* home.js — главная страница с sidebar */
 const HomePage = (function () {
     'use strict';
 

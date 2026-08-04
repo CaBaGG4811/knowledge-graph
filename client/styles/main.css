@@ -323,51 +323,6 @@ body {
 
 [dir="rtl"] .header-dropdown-item { text-align: right; }
 
-/* ============================================
-   Ghost Cards
-   ============================================ */
-.ghost-canvas {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: 0;
-    pointer-events: none;
-    overflow: hidden;
-}
-.ghost-card {
-    position: absolute;
-    width: 120px;
-    padding: 10px 12px;
-    background: #0a0a0a;
-    border: 1px solid #1a1a1a;
-    border-radius: 4px;
-    pointer-events: none;
-}
-.ghost-card-root {
-    width: 140px;
-    padding: 12px 14px;
-    border-color: #252525;
-    background: #0d0d0d;
-}
-.ghost-card-title {
-    font-size: 10px;
-    font-weight: 500;
-    color: #444;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.ghost-card-root .ghost-card-title {
-    font-size: 11px;
-    color: #555;
-}
-.ghost-line {
-    position: absolute;
-    height: 1px;
-    background: #1a1a1a;
-    transform-origin: 0 0;
-    pointer-events: none;
-}
 
 /* ============================================
    Toast
@@ -690,7 +645,6 @@ body {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
-    .ghost-canvas { display: none !important; }
 }
 
 /* ============================================
