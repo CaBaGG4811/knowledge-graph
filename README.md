@@ -19,7 +19,7 @@ git clone https://github.com/CaBaGG4811/knowledge-graph.git
 
 2. Зайди в папку проекта:
 ```bash
-cd knowledge-graph
+cd knowledge-graph/server
 ```
 
 3. Установи зависимости:
@@ -29,7 +29,7 @@ npm install
 
 4. Запусти сервер:
 ```bash
-node server/server.js
+npm start
 ```
 
 5. Открой в браузере: http://localhost:3000
