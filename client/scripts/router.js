@@ -4,6 +4,7 @@ const Router = (function () {
 
     var routes = {};
     var currentPath = null;
+    var navGeneration = 0;
 
     function register(path, handler) {
         routes[path] = handler;
@@ -14,7 +15,6 @@ const Router = (function () {
         var path = hash.replace('#', '');
 
         if (path === currentPath) {
-            // просто вызываем handler без анимации (обновление)
             var handler = routes[path];
             if (handler) handler();
             return;
@@ -22,18 +22,20 @@ const Router = (function () {
 
         var content = document.getElementById('app-content');
         var isNewPage = currentPath !== null;
+        currentPath = path;
 
         if (isNewPage && content) {
+            navGeneration++;
+            var gen = navGeneration;
             content.classList.add('page-exit');
             setTimeout(function () {
+                if (gen !== navGeneration) return;
                 content.classList.remove('page-exit');
                 renderPage(path, content);
             }, 250);
         } else {
             renderPage(path, content);
         }
-
-        currentPath = path;
     }
 
     function renderPage(path, content) {

@@ -130,9 +130,9 @@ function parseThinkingContent(text) {
                 label,
                 description: descM ? descM[1].trim().replace(/[*"']/g, '').substring(0, 300) : '',
                 why: whyM ? whyM[1].trim().replace(/[*"']/g, '').substring(0, 200) : '',
-                difficulty: diffM ? Math.min(5, Math.max(1, parseInt(diffM[1]))) : 3,
+                difficulty: diffM ? Math.min(5, Math.max(1, parseInt(diffM[1], 10))) : 3,
                 time: timeM ? timeM[1].trim().replace(/[*"']/g, '').substring(0, 50) : '',
-                level: levelM ? Math.min(3, Math.max(1, parseInt(levelM[1]))) : 1,
+                level: levelM ? Math.min(3, Math.max(1, parseInt(levelM[1], 10))) : 1,
                 leadsTo: leadsM ? leadsM[1].split(/[,\s]+/).filter(s => s.length > 1).map(s => s.replace(/[*"'\s]/g, '')) : []
             });
         }
@@ -243,6 +243,10 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: 'Тема пустая.' });
     }
 
+    if (topic.trim().length > 500) {
+        return res.status(400).json({ error: 'Тема слишком длинная (макс. 500 символов).' });
+    }
+
     const trimmedTopic = topic.trim();
 
     console.log('[Search] Searching for:', trimmedTopic);
@@ -337,9 +341,9 @@ ${searchContext}
             label: n.label || 'Без названия',
             description: cleanText(n.description || ''),
             why: cleanText(n.why || ''),
-            difficulty: Math.min(5, Math.max(1, parseInt(n.difficulty) || 3)),
+            difficulty: Math.min(5, Math.max(1, parseInt(n.difficulty, 10) || 3)),
             time: n.time || '',
-            level: Math.min(3, Math.max(1, parseInt(n.level) || 1)),
+            level: Math.min(3, Math.max(1, parseInt(n.level, 10) || 1)),
             leadsTo: Array.isArray(n.leadsTo) ? n.leadsTo.map(String) : []
         }));
 
@@ -401,7 +405,7 @@ router.post('/action', async (req, res) => {
                     var quizData = JSON.parse(match[0]);
                     if (Array.isArray(quizData) && quizData.length > 0) {
                         quizData = quizData.map(function (q) {
-                            var correctIdx = parseInt(q.correct) || 1;
+                            var correctIdx = parseInt(q.correct, 10) || 1;
                             if (correctIdx > 0 && correctIdx <= (q.options || []).length) correctIdx--;
                             else correctIdx = 0;
                             return { q: q.q || q.question || '', options: q.options || q.answers || [], correct: correctIdx };

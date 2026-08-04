@@ -10,49 +10,53 @@ let saveTimeout = null;
 function ensureInit() {
     if (!initPromise) {
         initPromise = (async function () {
-            const SQL = await initSqlJs();
+            try {
+                const SQL = await initSqlJs();
 
-            if (fs.existsSync(DB_PATH)) {
-                const fileBuffer = fs.readFileSync(DB_PATH);
-                db = new SQL.Database(fileBuffer);
-            } else {
-                db = new SQL.Database();
-            }
-
-            db.run(`
-                CREATE TABLE IF NOT EXISTS trees (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    graph_data TEXT NOT NULL,
-                    topic TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            `);
-
-            db.run(`
-                CREATE TABLE IF NOT EXISTS settings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE NOT NULL,
-                    value TEXT
-                )
-            `);
-
-            // дефолтные настройки
-            var defaults = {
-                theme: 'dark',
-                accent_color: '#4a7ab5',
-                font_size: 'medium',
-                lang: 'ru'
-            };
-            Object.keys(defaults).forEach(function (k) {
-                var exists = getOne('SELECT id FROM settings WHERE key = ?', [k]);
-                if (!exists) {
-                    runQuery('INSERT INTO settings (key, value) VALUES (?, ?)', [k, defaults[k]]);
+                if (fs.existsSync(DB_PATH)) {
+                    const fileBuffer = fs.readFileSync(DB_PATH);
+                    db = new SQL.Database(fileBuffer);
+                } else {
+                    db = new SQL.Database();
                 }
-            });
 
-            saveToDisk();
-            console.log('  База данных инициализирована');
+                db.run(`
+                    CREATE TABLE IF NOT EXISTS trees (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL,
+                        graph_data TEXT NOT NULL,
+                        topic TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+
+                db.run(`
+                    CREATE TABLE IF NOT EXISTS settings (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        key TEXT UNIQUE NOT NULL,
+                        value TEXT
+                    )
+                `);
+
+                var defaults = {
+                    theme: 'dark',
+                    accent_color: '#4a7ab5',
+                    font_size: 'medium',
+                    lang: 'ru'
+                };
+                Object.keys(defaults).forEach(function (k) {
+                    var exists = getOne('SELECT id FROM settings WHERE key = ?', [k]);
+                    if (!exists) {
+                        runQuery('INSERT INTO settings (key, value) VALUES (?, ?)', [k, defaults[k]]);
+                    }
+                });
+
+                saveToDisk();
+                console.log('  База данных инициализирована');
+            } catch (err) {
+                console.error('[DB] Init failed:', err.message);
+                process.exit(1);
+            }
         })();
     }
     return initPromise;
@@ -65,7 +69,9 @@ function saveToDisk() {
         try {
             const data = db.export();
             const buffer = Buffer.from(data);
-            fs.writeFileSync(DB_PATH, buffer);
+            fs.writeFile(DB_PATH, buffer, function (err) {
+                if (err) console.error('[DB] save error:', err.message);
+            });
         } catch (e) {
             console.error('[DB] save error:', e.message);
         }
@@ -73,38 +79,58 @@ function saveToDisk() {
 }
 
 function runQuery(sql, params) {
+    if (!db) throw new Error('DB not initialized');
     db.run(sql, params || []);
     saveToDisk();
 }
 
 function getOne(sql, params) {
+    if (!db) throw new Error('DB not initialized');
     const stmt = db.prepare(sql);
-    if (params) stmt.bind(params);
-    if (stmt.step()) {
-        const cols = stmt.getColumnNames();
-        const vals = stmt.get();
+    try {
+        if (params) stmt.bind(params);
+        if (stmt.step()) {
+            const cols = stmt.getColumnNames();
+            const vals = stmt.get();
+            const row = {};
+            cols.forEach(function (c, i) { row[c] = vals[i]; });
+            return row;
+        }
+        return null;
+    } finally {
         stmt.free();
-        const row = {};
-        cols.forEach(function (c, i) { row[c] = vals[i]; });
-        return row;
     }
-    stmt.free();
-    return null;
 }
 
 function getAll(sql, params) {
+    if (!db) throw new Error('DB not initialized');
     const results = [];
     const stmt = db.prepare(sql);
-    if (params) stmt.bind(params);
-    while (stmt.step()) {
-        const cols = stmt.getColumnNames();
-        const vals = stmt.get();
-        const row = {};
-        cols.forEach(function (c, i) { row[c] = vals[i]; });
-        results.push(row);
+    try {
+        if (params) stmt.bind(params);
+        while (stmt.step()) {
+            const cols = stmt.getColumnNames();
+            const vals = stmt.get();
+            const row = {};
+            cols.forEach(function (c, i) { row[c] = vals[i]; });
+            results.push(row);
+        }
+    } finally {
+        stmt.free();
     }
-    stmt.free();
     return results;
 }
+
+process.on('SIGINT', function () {
+    if (db) {
+        try {
+            const data = db.export();
+            const buffer = Buffer.from(data);
+            fs.writeFileSync(DB_PATH, buffer);
+        } catch (e) {}
+        db.close();
+    }
+    process.exit(0);
+});
 
 module.exports = { ensureInit, runQuery, getOne, getAll, saveToDisk };

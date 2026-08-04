@@ -71,7 +71,7 @@ const SettingsPage = (function () {
             var s = Store.get('settings');
             s[key] = value;
             Store.set('settings', s);
-            try { API.put('/api/settings', { [key]: value }); } catch (e) {}
+            API.put('/api/settings', { [key]: value }).catch(function () {});
         }
 
         document.querySelectorAll('.settings-option[data-setting]').forEach(function (btn) {
@@ -88,7 +88,7 @@ const SettingsPage = (function () {
                 Store.set('settings', s);
                 Store.applySettings(s);
 
-                try { API.put('/api/settings', { [key]: value }); } catch (e) {}
+                API.put('/api/settings', { [key]: value }).catch(function () {});
 
                 if (key === 'lang') {
                     I18n.setLang(value);
@@ -96,19 +96,6 @@ const SettingsPage = (function () {
                     render();
                     return;
                 }
-            });
-        });
-
-        document.querySelectorAll('.color-swatch').forEach(function (swatch) {
-            swatch.addEventListener('click', function () {
-                var color = swatch.getAttribute('data-color');
-                var s = Store.get('settings');
-                s.accentColor = color;
-                Store.set('settings', s);
-                document.querySelectorAll('.color-swatch').forEach(function (w) {
-                    w.classList.toggle('active', w === swatch);
-                });
-                saveSetting('accentColor', color);
             });
         });
 

@@ -81,6 +81,10 @@ const I18n = (function () {
             graphSearch: 'Поиск узла…',
             graphSearchEmpty: 'Ничего не найдено',
             graphPdf: 'PDF',
+            pdfLibsMissing: 'Библиотеки не загружены',
+            pdfExporting: 'Экспорт в PDF...',
+            pdfSaved: 'PDF сохранён',
+            pdfError: 'Ошибка экспорта',
 
             // Sidebar
             sortDateDesc: '↓ Дата',
@@ -181,6 +185,7 @@ const I18n = (function () {
             editDescription: 'Description',
             saveBtn: 'Save',
             errorPrefix: 'Error: ',
+            diffEasy: 'Easy',
             diffMedium: 'Medium',
             diffHard: 'Hard',
 
@@ -189,6 +194,10 @@ const I18n = (function () {
             graphSearch: 'Search node…',
             graphSearchEmpty: 'Nothing found',
             graphPdf: 'PDF',
+            pdfLibsMissing: 'Libraries not loaded',
+            pdfExporting: 'Exporting PDF...',
+            pdfSaved: 'PDF saved',
+            pdfError: 'Export error',
 
             sortDateDesc: '↓ Date',
             sortDateAsc: '↑ Date',
@@ -295,6 +304,10 @@ const I18n = (function () {
             graphSearch: '搜索节点…',
             graphSearchEmpty: '未找到',
             graphPdf: 'PDF',
+            pdfLibsMissing: '库未加载',
+            pdfExporting: '导出PDF...',
+            pdfSaved: 'PDF已保存',
+            pdfError: '导出错误',
 
             sortDateDesc: '↓ 日期',
             sortDateAsc: '↑ 日期',
@@ -401,6 +414,10 @@ const I18n = (function () {
             graphSearch: 'Buscar nodo…',
             graphSearchEmpty: 'Nada encontrado',
             graphPdf: 'PDF',
+            pdfLibsMissing: 'Bibliotecas no cargadas',
+            pdfExporting: 'Exportando PDF...',
+            pdfSaved: 'PDF guardado',
+            pdfError: 'Error de exportación',
 
             sortDateDesc: '↓ Fecha',
             sortDateAsc: '↑ Fecha',
@@ -507,6 +524,10 @@ const I18n = (function () {
             graphSearch: 'नोड खोजें…',
             graphSearchEmpty: 'कुछ नहीं मिला',
             graphPdf: 'PDF',
+            pdfLibsMissing: 'लाइब्रेरी लोड नहीं हुई',
+            pdfExporting: 'PDF एक्सपोर्ट हो रहा है...',
+            pdfSaved: 'PDF सहेजा गया',
+            pdfError: 'एक्सपोर्ट त्रुटि',
 
             sortDateDesc: '↓ तिथि',
             sortDateAsc: '↑ तिथि',
@@ -613,6 +634,10 @@ const I18n = (function () {
             graphSearch: 'بحث عن عقدة…',
             graphSearchEmpty: 'لا شيء',
             graphPdf: 'PDF',
+            pdfLibsMissing: 'المكتبات غير محملة',
+            pdfExporting: 'تصدير PDF...',
+            pdfSaved: 'تم حفظ PDF',
+            pdfError: 'خطأ في التصدير',
 
             sortDateDesc: '↓ التاريخ',
             sortDateAsc: '↑ التاريخ',

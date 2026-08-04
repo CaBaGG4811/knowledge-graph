@@ -145,7 +145,7 @@ const GraphRenderer = (function () {
 
         var svg = d3.select('#graph-container').append('svg').attr('width', width).attr('height', height);
 
-        var isDark = true;
+        var isDark = (Store.get('settings') || {}).theme !== 'light';
         var styles = CARD_STYLES;
 
         var defs = svg.append('defs');
@@ -185,7 +185,11 @@ const GraphRenderer = (function () {
         feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
         var graphGroup = svg.append('g').attr('class', 'graph-root');
-        var zoomBehavior = d3.zoom().scaleExtent([0.15, 4]).on('zoom', function (e) { graphGroup.attr('transform', e.transform); });
+        var positionKey = 'graph_pos_' + (topicName || '').replace(/\s+/g, '_');
+        var zoomBehavior = d3.zoom().scaleExtent([0.15, 4]).on('zoom', function (e) {
+            graphGroup.attr('transform', e.transform);
+            try { localStorage.setItem(positionKey, JSON.stringify({ x: e.transform.x, y: e.transform.y, k: e.transform.k })); } catch (ex) {}
+        });
         svg.call(zoomBehavior);
 
         // дерево
@@ -415,10 +419,6 @@ const GraphRenderer = (function () {
         };
 
         // сохранение позиции
-        var positionKey = 'graph_pos_' + (topicName || '').replace(/\s+/g, '_');
-        svg.on('zoom', function (e) {
-            try { localStorage.setItem(positionKey, JSON.stringify({ x: e.transform.x, y: e.transform.y, k: e.transform.k })); } catch (ex) {}
-        });
         var savedPos = null;
         try { savedPos = JSON.parse(localStorage.getItem(positionKey)); } catch (ex) {}
         if (savedPos) {
@@ -441,17 +441,17 @@ const GraphRenderer = (function () {
             var svgEl = document.querySelector('#graph-container svg');
             if (!svgEl) return;
             if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
-                Toast.show('Библиотеки не загружены', 'error');
+                Toast.show(I18n.t('pdfLibsMissing') || 'Libraries not loaded', 'error');
                 return;
             }
-            Toast.show('Экспорт в PDF...', 'info');
+            Toast.show(I18n.t('pdfExporting') || 'Exporting PDF...', 'info');
             html2canvas(svgEl, { backgroundColor: '#000000', scale: 2 }).then(function (canvas) {
                 var imgData = canvas.toDataURL('image/png');
                 var pdf = new jspdf.jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
                 pdf.save((topicName || 'knowledge-tree') + '.pdf');
-                Toast.show('PDF сохранён', 'success');
-            }).catch(function () { Toast.show('Ошибка экспорта', 'error'); });
+                Toast.show(I18n.t('pdfSaved') || 'PDF saved', 'success');
+            }).catch(function () { Toast.show(I18n.t('pdfError') || 'Export error', 'error'); });
         };
 
         window._graphUpdateNode = function (nodeId, newData) {

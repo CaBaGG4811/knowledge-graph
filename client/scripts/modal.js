@@ -2,6 +2,7 @@
 const ModalManager = (function () {
     'use strict';
 
+    var self;
     var overlay, currentNode = null, currentGraphData = null;
 
     function escapeHtml(str) {
@@ -84,7 +85,7 @@ const ModalManager = (function () {
 
                 <div class="modal-block">
                     <div class="modal-block-label">${t('whyLearn')}</div>
-                    <div class="modal-block-text">${nodeData.why && nodeData.why.indexOf('фундаментальная тема') === -1 ? escapeHtml(nodeData.why) : t('defaultWhy')}</div>
+                    <div class="modal-block-text">${nodeData.why && nodeData.why !== t('defaultWhy') ? escapeHtml(nodeData.why) : t('defaultWhy')}</div>
                 </div>
 
                 <div class="modal-dual">
@@ -116,7 +117,7 @@ const ModalManager = (function () {
         document.getElementById('modal-edit-btn').addEventListener('click', function () {
             closeModal();
             setTimeout(function () {
-                ModalManager.openEditModal(nodeData, function (updated) {
+                self.openEditModal(nodeData, function (updated) {
                     var node = currentGraphData ? currentGraphData.nodes.find(function (n) { return n.id === updated.id; }) : null;
                     if (node) { node.label = updated.label; node.description = updated.description; }
                     openModal(updated, currentGraphData);
@@ -144,6 +145,7 @@ const ModalManager = (function () {
 
     function closeModal() {
         if (overlay) overlay.classList.add('hidden');
+        document.body.style.overflow = '';
         currentNode = null;
     }
 
@@ -161,7 +163,7 @@ const ModalManager = (function () {
                 action: action,
                 label: currentNode.label,
                 description: currentNode.description
-            });
+            }) || {};
 
             var html = '';
             if (action === 'quiz' && Array.isArray(result.data)) {
@@ -228,7 +230,8 @@ const ModalManager = (function () {
     }
 
     function saveText(el) {
-        var text = el.innerText || el.textContent;
+        var textEl = el.querySelector('.modal-ai-text') || el.querySelector('.quiz-box') || el;
+        var text = (textEl.innerText || textEl.textContent || '').replace(/\n+(Сохранить|Закрыть|Save|Close)$/i, '').trim();
         var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
@@ -264,5 +267,6 @@ const ModalManager = (function () {
         });
     }
 
-    return { openModal: openModal, openModalById: openModalById, closeModal: closeModal, openEditModal: openEditModal };
+    self = { openModal: openModal, openModalById: openModalById, closeModal: closeModal, openEditModal: openEditModal };
+    return self;
 })();

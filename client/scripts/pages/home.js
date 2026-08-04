@@ -6,7 +6,6 @@ const HomePage = (function () {
     var hintIndex = 0;
     var hintTimer = null;
     var loadingAnimFrame = null;
-    var ghostTimer = null;
     var _docClickHandlers = [];
 
     var topicSuggestions = [
@@ -65,7 +64,6 @@ const HomePage = (function () {
                     </div>
                 </div>
             </div>
-            <div id="ghost-canvas" class="ghost-canvas"></div>
             <div id="home-loading" class="loading-overlay hidden">
                 <div class="loading-panel">
                     <div id="home-loading-tip" class="loading-tip"></div>
@@ -82,7 +80,6 @@ const HomePage = (function () {
         bindEvents();
         startHints();
         loadSidebarHistory();
-        startGhostAnimation();
     }
 
     function buildSuggestDropdown() {
@@ -220,15 +217,6 @@ const HomePage = (function () {
        Ghost Card Animation — Background
        ============================================ */
 
-    function startGhostAnimation() {
-    }
-
-    function stopGhostAnimation() {
-        if (ghostTimer) { clearTimeout(ghostTimer); ghostTimer = null; }
-        var canvas = document.getElementById('ghost-canvas');
-        if (canvas) canvas.innerHTML = '';
-    }
-
     /* ============================================
        Hints
        ============================================ */
@@ -267,7 +255,6 @@ const HomePage = (function () {
         var btn = document.getElementById('home-generate-btn');
         btn.disabled = true;
         clearInterval(hintTimer);
-        stopGhostAnimation();
 
         var subtitle = document.getElementById('home-subtitle');
         subtitle.textContent = t('generating') + topic + '\u00BB';
@@ -290,7 +277,6 @@ const HomePage = (function () {
             Toast.show(err.message, 'error');
             subtitle.textContent = t('homeSubtitle');
             startHints();
-            startGhostAnimation();
         } finally {
             btn.disabled = false;
         }
@@ -314,7 +300,7 @@ const HomePage = (function () {
                     <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${topic}</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:6px;">
-                    <input type="text" id="graph-search" class="graph-search-input" placeholder="${t('search') || 'Поиск...'}" autocomplete="off">
+                    <input type="text" id="graph-search" class="graph-search-input" placeholder="${t('graphSearch') || 'Поиск...'}" autocomplete="off">
                     <button class="btn btn-sm" id="graph-pdf" title="PDF">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </button>
@@ -335,8 +321,10 @@ const HomePage = (function () {
             setTimeout(function () { document.body.style.overflow = 'auto'; render(); }, 300);
         });
         document.getElementById('graph-save').addEventListener('click', async function () {
+            var btn = this;
             var name = prompt(t('saveTreePrompt'));
             if (!name) return;
+            btn.disabled = true;
             try {
                 await API.post('/api/trees', { name: name, graph_data: graphData, topic: topic });
                 saveToCache(topic, graphData);
@@ -345,6 +333,8 @@ const HomePage = (function () {
             } catch (err) {
                 saveToCache(topic, graphData);
                 Toast.show(t('saveTreeSuccess'), 'success');
+            } finally {
+                btn.disabled = false;
             }
         });
         document.getElementById('graph-pdf').addEventListener('click', function () {

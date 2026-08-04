@@ -6,7 +6,7 @@ const Store = (function () {
         settings: { theme: 'dark', accentColor: '#e0e0e0', fontSize: 'medium', lang: 'ru', llmUrl: '', llmModel: '' }
     };
 
-    function get(key) { return key ? state[key] : state; }
+    function get(key) { return key ? Object.assign({}, state[key]) : Object.assign({}, state); }
 
     function set(key, value) {
         state[key] = value;
