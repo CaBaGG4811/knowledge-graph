@@ -16,12 +16,6 @@ const HomePage = (function () {
         { group: 'Другое', items: ['Философия', 'История Древнего Рима', 'Биоинформатика'] }
     ];
 
-    var ghostTopics = [
-        'Нейронные сети', 'Квантовая физика', 'Машинное обучение', 'Термодинамика',
-        'Кибербезопасность', 'Линейная алгебра', 'Астрофизика', 'Биоинформатика',
-        'Алгоритмы', 'Электромагнетизм', 'Философия', 'Теория вероятностей'
-    ];
-
     function render() {
         document.body.style.overflow = 'hidden';
         var t = I18n.t;
@@ -144,7 +138,7 @@ const HomePage = (function () {
                 return;
             }
             listEl.innerHTML = '';
-            data.trees.slice().reverse().forEach(function (tree) {
+            data.trees.forEach(function (tree) {
                 var item = document.createElement('button');
                 item.className = 'sidebar-item';
                 var dateStr = tree.created_at ? new Date(tree.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
@@ -355,7 +349,7 @@ const HomePage = (function () {
         if (loadingAnimFrame) { clearTimeout(loadingAnimFrame); loadingAnimFrame = null; }
         var bar = document.getElementById('home-loading-bar');
         if (bar) bar.classList.remove('waiting');
-        var steps = 6, i = 0;
+        var steps = 7, i = 0;
         function markDone() {
             if (i >= steps) { if (bar) bar.style.width = '100%'; var p = document.getElementById('home-loading-percent'); if (p) p.textContent = '100%'; return; }
             var el = document.getElementById('hl-step-' + i);

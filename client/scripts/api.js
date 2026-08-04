@@ -14,13 +14,15 @@ const API = (function () {
         if (options.timeout !== false) {
             controller = new AbortController();
             options.signal = controller.signal;
-            var timeoutMs = options.timeout || 600000;
+            var timeoutMs = options.timeout || 120000;
             timer = setTimeout(function () { controller.abort(); }, timeoutMs);
         }
         try {
             var response = await fetch(url, options);
-            var data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Ошибка сервера');
+            var text = await response.text();
+            var data;
+            try { data = JSON.parse(text); } catch (e) { data = null; }
+            if (!response.ok) throw new Error((data && data.error) || 'Ошибка сервера (' + response.status + ')');
             return data;
         } finally {
             if (timer) clearTimeout(timer);

@@ -2,8 +2,6 @@
 const SettingsPage = (function () {
     'use strict';
 
-    var accentColors = ['#e0e0e0', '#22c55e', '#3b82f6', '#eab308', '#ef4444', '#a855f7', '#ec4899', '#06b6d4'];
-
     function render() {
         document.body.style.overflow = 'auto';
         var t = I18n.t;

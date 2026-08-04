@@ -18,14 +18,6 @@ const GraphRenderer = (function () {
         4: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' }
     };
 
-    var CARD_STYLES_LIGHT = {
-        0: { fill: 'url(#card-gradient-root)', stroke: '#ccc', strokeWidth: 1, titleColor: '#111', descColor: '#666' },
-        1: { fill: 'url(#card-gradient-l1)', stroke: '#ddd', strokeWidth: 1, titleColor: '#222', descColor: '#777' },
-        2: { fill: 'url(#card-gradient-l2)', stroke: '#ddd', strokeWidth: 1, titleColor: '#333', descColor: '#777' },
-        3: { fill: 'url(#card-gradient-l3)', stroke: '#e0e0e0', strokeWidth: 1, titleColor: '#444', descColor: '#888' },
-        4: { fill: 'url(#card-gradient-l4)', stroke: '#e0e0e0', strokeWidth: 1, titleColor: '#555', descColor: '#888' }
-    };
-
     var currentEdgesProcessed = [];
 
     function truncateText(text, maxLen) {
@@ -49,6 +41,7 @@ const GraphRenderer = (function () {
     }
 
     function findRootNodeId(nodes, edges) {
+        if (!nodes || nodes.length === 0) return null;
         var explicitRoot = nodes.find(function (n) { return n.level === 1; });
         if (explicitRoot) return explicitRoot.id;
         var outgoing = {};
@@ -145,20 +138,21 @@ const GraphRenderer = (function () {
         if (!container) return;
         container.innerHTML = '';
         currentEdgesProcessed = [];
+        if (!graphData || !graphData.nodes || graphData.nodes.length === 0) return;
 
         var width = window.innerWidth;
         var height = window.innerHeight;
 
         var svg = d3.select('#graph-container').append('svg').attr('width', width).attr('height', height);
 
-        var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-        var styles = isDark ? CARD_STYLES : CARD_STYLES_LIGHT;
+        var isDark = true;
+        var styles = CARD_STYLES;
 
         var defs = svg.append('defs');
 
         var bgGrad = defs.append('radialGradient').attr('id', 'vignette-bg').attr('cx', '50%').attr('cy', '55%').attr('r', '55%');
-        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', isDark ? '#0a0a0a' : '#f5f5f5');
-        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', isDark ? '#000000' : '#e0e0e0');
+        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', '#0a0a0a');
+        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', '#000000');
         svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#vignette-bg)');
 
         function addGrad(id, c1, c2) {

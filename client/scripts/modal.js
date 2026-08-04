@@ -4,6 +4,11 @@ const ModalManager = (function () {
 
     var overlay, currentNode = null, currentGraphData = null;
 
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function ensureDom() {
         if (overlay) return;
         overlay = document.createElement('div');
@@ -61,22 +66,22 @@ const ModalManager = (function () {
             <button class="modal-close" id="modal-close-btn">&times;</button>
 
             <div class="modal-header">
-                <h2 class="modal-title">${nodeData.label}</h2>
+                <h2 class="modal-title">${escapeHtml(nodeData.label)}</h2>
                 <div class="modal-meta-row">
                     ${difficultyBar(nodeData.difficulty || 3)}
-                    ${nodeData.time ? '<span class="modal-time-badge">' + nodeData.time + '</span>' : ''}
+                    ${nodeData.time ? '<span class="modal-time-badge">' + escapeHtml(nodeData.time) + '</span>' : ''}
                 </div>
             </div>
 
             <div class="modal-body">
                 <div class="modal-block">
                     <div class="modal-block-label">${t('whatIs')}</div>
-                    <div class="modal-block-text">${nodeData.description || '—'}</div>
+                    <div class="modal-block-text">${escapeHtml(nodeData.description) || '—'}</div>
                 </div>
 
                 <div class="modal-block">
                     <div class="modal-block-label">${t('whyLearn')}</div>
-                    <div class="modal-block-text">${nodeData.why && nodeData.why.indexOf('фундаментальная тема') === -1 ? nodeData.why : t('defaultWhy')}</div>
+                    <div class="modal-block-text">${nodeData.why && nodeData.why.indexOf('фундаментальная тема') === -1 ? escapeHtml(nodeData.why) : t('defaultWhy')}</div>
                 </div>
 
                 <div class="modal-dual">

@@ -194,7 +194,7 @@ function llmFetch(url, body, extraHeaders) {
         const lib = isHttps ? https : http;
         const data = JSON.stringify(body);
         const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
-        if (LLM_API_KEY) headers['x-api-key'] = LLM_API_KEY;
+        if (LLM_API_KEY) headers['Authorization'] = 'Bearer ' + LLM_API_KEY;
         if (extraHeaders) Object.assign(headers, extraHeaders);
         const req = lib.request({
             hostname: parsed.hostname,

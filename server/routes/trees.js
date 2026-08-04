@@ -11,7 +11,11 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
     const tree = getOne('SELECT * FROM trees WHERE id = ?', [req.params.id]);
     if (!tree) return res.status(404).json({ error: 'Дерево не найдено' });
-    res.json({ tree: { ...tree, graph_data: JSON.parse(tree.graph_data) } });
+    try {
+        res.json({ tree: { ...tree, graph_data: JSON.parse(tree.graph_data) } });
+    } catch (e) {
+        res.json({ tree: { ...tree, graph_data: null } });
+    }
 });
 
 router.post('/', (req, res) => {
