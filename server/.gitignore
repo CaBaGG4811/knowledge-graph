@@ -1,0 +1,4 @@
+node_modules/
+knowledge-graph.db
+.env
+*.log

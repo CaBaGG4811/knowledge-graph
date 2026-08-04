@@ -1,0 +1,21 @@
+:root, [data-theme="dark"] {
+    --bg-body: #000000;
+    --bg-card: #111111;
+    --bg-input: #1a1a1a;
+    --bg-hover: #1a1a1a;
+    --bg-active: #222222;
+    --text-primary: #e0e0e0;
+    --text-secondary: #888888;
+    --text-dim: #555555;
+    --accent: #e0e0e0;
+    --accent-hover: #ffffff;
+    --accent-green: #22c55e;
+    --accent-gold: #eab308;
+    --border: #222222;
+    --border-dim: #1a1a1a;
+    --overlay: rgba(0, 0, 0, 0.9);
+    --shadow: rgba(0, 0, 0, 0.5);
+    --glass-bg: #141414;
+    --glass-border: #222222;
+    --glass-shine: rgba(255, 255, 255, 0.03);
+}

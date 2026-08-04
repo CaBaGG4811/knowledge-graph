@@ -1,0 +1,10 @@
+node_modules/
+server/data/
+server/*.db
+server/.env
+*.log
+.DS_Store
+Thumbs.db
+error.log
+start.bat
+test_search.js
