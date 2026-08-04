@@ -14,7 +14,6 @@ const SettingsPage = (function () {
             <div class="settings-page">
                 <div class="settings-topbar">
                     <a href="#/app" class="btn btn-sm">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                         ${t('settingsBack')}
                     </a>
                 </div>
@@ -23,11 +22,11 @@ const SettingsPage = (function () {
                 <div class="settings-section">
                     <div class="settings-section-title">LLM</div>
                     <div class="settings-group">
-                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
                             <span class="settings-label">${t('settingLlmUrl') || 'URL сервера'}</span>
                             <input type="text" class="settings-input" id="settings-llm-url" placeholder="http://172.29.192.1:1234/v1/chat/completions" value="${s.llmUrl || ''}">
                         </div>
-                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
                             <span class="settings-label">${t('settingLlmModel') || 'Модель'}</span>
                             <input type="text" class="settings-input" id="settings-llm-model" placeholder="google/gemma-4-12b-qat" value="${s.llmModel || ''}">
                         </div>
@@ -37,7 +36,7 @@ const SettingsPage = (function () {
                 <div class="settings-section">
                     <div class="settings-section-title">${t('sectionAppearance')}</div>
                     <div class="settings-group">
-                        <div class="settings-row">
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:12px; padding:14px 0;">
                             <span class="settings-label">${t('settingFontSize')}</span>
                             <div class="settings-control">
                                 <button class="settings-option ${s.fontSize === 'small' ? 'active' : ''}" data-setting="fontSize" data-value="small">${t('fontSmall')}</button>
@@ -45,7 +44,7 @@ const SettingsPage = (function () {
                                 <button class="settings-option ${s.fontSize === 'large' ? 'active' : ''}" data-setting="fontSize" data-value="large">${t('fontLarge')}</button>
                             </div>
                         </div>
-                        <div class="settings-row">
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:12px; padding:14px 0;">
                             <span class="settings-label">${t('settingLanguage')}</span>
                             <div class="settings-control">
                                 ${langList.map(function (l) {
@@ -74,9 +73,17 @@ const SettingsPage = (function () {
             btn.addEventListener('click', function () {
                 var key = btn.getAttribute('data-setting');
                 var value = btn.getAttribute('data-value');
+
+                document.querySelectorAll('.settings-option[data-setting="' + key + '"]').forEach(function (b) {
+                    b.classList.toggle('active', b === btn);
+                });
+
                 var s = Store.get('settings');
                 s[key] = value;
                 Store.set('settings', s);
+                Store.applySettings(s);
+
+                try { API.put('/api/settings', { [key]: value }); } catch (e) {}
 
                 if (key === 'lang') {
                     I18n.setLang(value);
@@ -84,11 +91,6 @@ const SettingsPage = (function () {
                     render();
                     return;
                 }
-
-                document.querySelectorAll('.settings-option[data-setting="' + key + '"]').forEach(function (b) {
-                    b.classList.toggle('active', b === btn);
-                });
-                saveSetting(key, value);
             });
         });
 
