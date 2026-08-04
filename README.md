@@ -12,13 +12,28 @@
 
 ## Установка
 
+1. Клонируй репозиторий:
+```bash
+git clone https://github.com/CaBaGG4811/knowledge-graph.git
+```
+
+2. Зайди в папку проекта:
+```bash
+cd knowledge-graph
+```
+
+3. Установи зависимости:
 ```bash
 npm install
+```
+
+4. Запусти сервер:
+```bash
 node server/server.js
 ```
 
-Откройте http://localhost:3000
+5. Открой в браузере: http://localhost:3000
 
 ## Настройки
 
-В настройках можно указать URL и модель LLM сервера.
+В настройках можно указать URL и модель LLM сервера (LM Studio).
