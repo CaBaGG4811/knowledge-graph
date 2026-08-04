@@ -413,6 +413,61 @@ const GraphRenderer = (function () {
         window._graphHighlight = function (nodeId) {
             highlightConnections(nodeId, nodesFlat);
         };
+
+        // сохранение позиции
+        var positionKey = 'graph_pos_' + (topicName || '').replace(/\s+/g, '_');
+        svg.on('zoom', function (e) {
+            try { localStorage.setItem(positionKey, JSON.stringify({ x: e.transform.x, y: e.transform.y, k: e.transform.k })); } catch (ex) {}
+        });
+        var savedPos = null;
+        try { savedPos = JSON.parse(localStorage.getItem(positionKey)); } catch (ex) {}
+        if (savedPos) {
+            var initTransform = d3.zoomIdentity.translate(savedPos.x, savedPos.y).scale(savedPos.k);
+            svg.call(zoomBehavior.transform, initTransform);
+        }
+
+        // поиск по графу
+        window._graphSearch = function (query) {
+            if (!query) { removeHoverEffect(); return; }
+            var q = query.toLowerCase();
+            d3.selectAll('.knowledge-node').each(function (d) {
+                var match = (d.label || '').toLowerCase().indexOf(q) !== -1 || (d.description || '').toLowerCase().indexOf(q) !== -1;
+                d3.select(this).classed('dimmed', !match).classed('highlighted', match);
+            });
+        };
+
+        // публичные методы
+        window._graphExportPdf = function () {
+            var svgEl = document.querySelector('#graph-container svg');
+            if (!svgEl) return;
+            if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
+                Toast.show('Библиотеки не загружены', 'error');
+                return;
+            }
+            Toast.show('Экспорт в PDF...', 'info');
+            html2canvas(svgEl, { backgroundColor: '#000000', scale: 2 }).then(function (canvas) {
+                var imgData = canvas.toDataURL('image/png');
+                var pdf = new jspdf.jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save((topicName || 'knowledge-tree') + '.pdf');
+                Toast.show('PDF сохранён', 'success');
+            }).catch(function () { Toast.show('Ошибка экспорта', 'error'); });
+        };
+
+        window._graphUpdateNode = function (nodeId, newData) {
+            var node = nodesFlat.find(function (n) { return n.id === nodeId; });
+            if (!node) return;
+            if (newData.label !== undefined) node.label = newData.label;
+            if (newData.description !== undefined) node.description = newData.description;
+            var sel = nodeElements.filter(function (n) { return n.id === nodeId; });
+            sel.select('.node-card-title').text(function (d) { return truncateText(d.label, 22); });
+            sel.select('.node-card-desc').text(function (d) {
+                if (!d.description) return '';
+                return truncateText(shortDescription(d.description), 30);
+            });
+        };
+
+        window._getCurrentGraphData = function () { return graphData; };
     }
 
     return { renderGraph: renderGraph };

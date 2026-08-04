@@ -24,9 +24,18 @@ const HomePage = (function () {
             <div class="home-layout">
                 <aside class="home-sidebar" id="home-sidebar">
                     <div class="sidebar-header">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>${t('menuHistory')}</span>
+                        <div class="sidebar-header-left">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span>${t('menuHistory')}</span>
+                        </div>
+                        <select class="sidebar-sort" id="sidebar-sort">
+                            <option value="date-desc">${t('sortDateDesc') || '↓ Дата'}</option>
+                            <option value="date-asc">${t('sortDateAsc') || '↑ Дата'}</option>
+                            <option value="name-asc">${t('sortNameAsc') || '↑ Имя'}</option>
+                            <option value="name-desc">${t('sortNameDesc') || '↓ Имя'}</option>
+                        </select>
                     </div>
+                    <div class="sidebar-stats" id="sidebar-stats"></div>
                     <div class="sidebar-list" id="sidebar-list">
                         <div class="sidebar-empty">${t('historyEmpty')}</div>
                     </div>
@@ -121,11 +130,17 @@ const HomePage = (function () {
         document.getElementById('sidebar-settings').addEventListener('click', function () {
             window.location.hash = '#/settings';
         });
+        document.getElementById('sidebar-sort').addEventListener('change', function () {
+            _sortMode = this.value;
+            loadSidebarHistory();
+        });
     }
 
     /* ============================================
        Sidebar History
        ============================================ */
+
+    var _sortMode = 'date-desc';
 
     async function loadSidebarHistory() {
         var t = I18n.t;
@@ -134,28 +149,70 @@ const HomePage = (function () {
         try {
             var data = await API.get('/api/trees');
             if (!data.trees || data.trees.length === 0) {
-                listEl.innerHTML = '<div class="sidebar-empty">' + t('historyEmpty') + '</div>';
+                var cached = JSON.parse(localStorage.getItem('kg_cache') || '[]');
+                if (cached.length > 0) {
+                    listEl.innerHTML = '';
+                    cached.forEach(function (c) {
+                        var item = document.createElement('button');
+                        item.className = 'sidebar-item';
+                        var dateStr = c.date ? new Date(c.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+                        item.innerHTML = '<div class="sidebar-item-info"><span class="sidebar-item-name">' + (c.topic || '—') + '</span>' +
+                            (dateStr ? '<span class="sidebar-item-date">' + dateStr + '</span>' : '') + '</div>';
+                        item.addEventListener('click', function () { showGraph(c.data, c.topic); });
+                        listEl.appendChild(item);
+                    });
+                } else {
+                    listEl.innerHTML = '<div class="sidebar-empty">' + t('historyEmpty') + '</div>';
+                }
                 return;
             }
+            var trees = data.trees.slice();
+            if (_sortMode === 'date-desc') trees.sort(function (a, b) { return (b.created_at || '').localeCompare(a.created_at || ''); });
+            else if (_sortMode === 'date-asc') trees.sort(function (a, b) { return (a.created_at || '').localeCompare(b.created_at || ''); });
+            else if (_sortMode === 'name-asc') trees.sort(function (a, b) { return (a.topic || a.name || '').localeCompare(b.topic || b.name || ''); });
+            else if (_sortMode === 'name-desc') trees.sort(function (a, b) { return (b.topic || b.name || '').localeCompare(a.topic || a.name || ''); });
             listEl.innerHTML = '';
-            data.trees.forEach(function (tree) {
-                var item = document.createElement('button');
-                item.className = 'sidebar-item';
+            trees.forEach(function (tree) {
+                var item = document.createElement('div');
+                item.className = 'sidebar-item-row';
+                var btn = document.createElement('button');
+                btn.className = 'sidebar-item';
                 var dateStr = tree.created_at ? new Date(tree.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
-                var iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
-                item.innerHTML = '<div class="sidebar-item-icon">' + iconSvg + '</div>' +
-                    '<div class="sidebar-item-info"><span class="sidebar-item-name">' + (tree.name || tree.topic || '—') + '</span>' +
+                btn.innerHTML = '<div class="sidebar-item-info"><span class="sidebar-item-name">' + (tree.name || tree.topic || '—') + '</span>' +
                     (dateStr ? '<span class="sidebar-item-date">' + dateStr + '</span>' : '') + '</div>';
-                item.addEventListener('click', function () {
+                btn.addEventListener('click', function () {
                     try {
                         var gd = typeof tree.graph_data === 'string' ? JSON.parse(tree.graph_data) : tree.graph_data;
                         showGraph(gd, tree.topic || tree.name);
                     } catch (e) { Toast.show(t('loadError'), 'error'); }
                 });
+                var delBtn = document.createElement('button');
+                delBtn.className = 'sidebar-item-delete';
+                delBtn.innerHTML = '&times;';
+                delBtn.title = t('delete') || 'Удалить';
+                delBtn.addEventListener('click', function (e) { e.stopPropagation(); deleteTree(tree.id); });
+                item.appendChild(btn);
+                item.appendChild(delBtn);
                 listEl.appendChild(item);
             });
+            var statsEl = document.getElementById('sidebar-stats');
+            if (statsEl) {
+                statsEl.textContent = data.trees.length + ' ' + (t('treesCount') || 'деревьев');
+            }
         } catch (err) {
-            listEl.innerHTML = '<div class="sidebar-empty">' + t('errorPrefix') + err.message + '</div>';
+            var cached2 = JSON.parse(localStorage.getItem('kg_cache') || '[]');
+            if (cached2.length > 0) {
+                listEl.innerHTML = '';
+                cached2.forEach(function (c) {
+                    var item = document.createElement('button');
+                    item.className = 'sidebar-item';
+                    item.innerHTML = '<div class="sidebar-item-info"><span class="sidebar-item-name">' + (c.topic || '—') + '</span></div>';
+                    item.addEventListener('click', function () { showGraph(c.data, c.topic); });
+                    listEl.appendChild(item);
+                });
+            } else {
+                listEl.innerHTML = '<div class="sidebar-empty">' + t('errorPrefix') + err.message + '</div>';
+            }
         }
     }
 
@@ -256,13 +313,14 @@ const HomePage = (function () {
                     </button>
                     <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${topic}</span>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="text" id="graph-search" class="graph-search-input" placeholder="${t('search') || 'Поиск...'}" autocomplete="off">
+                    <button class="btn btn-sm" id="graph-pdf" title="PDF">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    </button>
                     <button class="btn btn-sm" id="graph-save">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                         ${t('graphSave')}
-                    </button>
-                    <button class="btn btn-sm" id="graph-settings-btn" title="Settings">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                     </button>
                 </div>
             </div>
@@ -274,21 +332,30 @@ const HomePage = (function () {
             var topbar = document.getElementById('top-bar');
             if (container) container.style.opacity = '0';
             if (topbar) topbar.style.opacity = '0';
-            setTimeout(function () { render(); }, 300);
+            setTimeout(function () { document.body.style.overflow = 'auto'; render(); }, 300);
         });
         document.getElementById('graph-save').addEventListener('click', async function () {
             var name = prompt(t('saveTreePrompt'));
             if (!name) return;
             try {
                 await API.post('/api/trees', { name: name, graph_data: graphData, topic: topic });
+                saveToCache(topic, graphData);
                 Toast.show(t('saveTreeSuccess'), 'success');
+                loadSidebarHistory();
             } catch (err) {
-                Toast.show(err.message, 'error');
+                saveToCache(topic, graphData);
+                Toast.show(t('saveTreeSuccess'), 'success');
             }
         });
-        document.getElementById('graph-settings-btn').addEventListener('click', function () {
-            window.location.hash = '#/settings';
+        document.getElementById('graph-pdf').addEventListener('click', function () {
+            if (window._graphExportPdf) window._graphExportPdf();
         });
+        var searchInput = document.getElementById('graph-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                if (window._graphSearch) window._graphSearch(searchInput.value.trim());
+            });
+        }
 
         GraphRenderer.renderGraph(graphData, topic);
     }
@@ -366,6 +433,42 @@ const HomePage = (function () {
         if (loadingAnimFrame) { clearTimeout(loadingAnimFrame); loadingAnimFrame = null; }
         var el = document.getElementById('home-loading');
         if (el) el.classList.add('hidden');
+    }
+
+    /* ============================================
+       Cache / Offline
+       ============================================ */
+
+    function saveToCache(topic, graphData) {
+        try {
+            var cache = JSON.parse(localStorage.getItem('kg_cache') || '[]');
+            cache.unshift({ topic: topic, data: graphData, date: Date.now() });
+            if (cache.length > 20) cache = cache.slice(0, 20);
+            localStorage.setItem('kg_cache', JSON.stringify(cache));
+        } catch (e) {}
+    }
+
+    function getFromCache(topic) {
+        try {
+            var cache = JSON.parse(localStorage.getItem('kg_cache') || '[]');
+            return cache.find(function (c) { return c.topic === topic; });
+        } catch (e) { return null; }
+    }
+
+    /* ============================================
+       Delete Tree
+       ============================================ */
+
+    async function deleteTree(id) {
+        var t = I18n.t;
+        if (!confirm(t('confirmDelete') || 'Удалить дерево?')) return;
+        try {
+            await API.del('/api/trees/' + id);
+            Toast.show(t('deleteSuccess') || 'Удалено', 'success');
+            loadSidebarHistory();
+        } catch (err) {
+            Toast.show(err.message, 'error');
+        }
     }
 
     return { render: render };

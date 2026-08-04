@@ -43,6 +43,13 @@ const SettingsPage = (function () {
                             </div>
                         </div>
                         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:12px; padding:14px 0;">
+                            <span class="settings-label">${t('settingTheme') || 'Тема'}</span>
+                            <div class="settings-control">
+                                <button class="settings-option ${s.theme === 'dark' ? 'active' : ''}" data-setting="theme" data-value="dark">${t('themeDark') || 'Тёмная'}</button>
+                                <button class="settings-option ${s.theme === 'light' ? 'active' : ''}" data-setting="theme" data-value="light">${t('themeLight') || 'Светлая'}</button>
+                            </div>
+                        </div>
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:12px; padding:14px 0;">
                             <span class="settings-label">${t('settingLanguage')}</span>
                             <div class="settings-control">
                                 ${langList.map(function (l) {

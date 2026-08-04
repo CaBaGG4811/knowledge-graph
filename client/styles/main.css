@@ -174,8 +174,8 @@ body {
 
 .sidebar-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
     padding: 16px 16px;
     border-bottom: 1px solid #1a1a1a;
     font-size: 12px;
@@ -184,6 +184,23 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
+.sidebar-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.sidebar-sort {
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 3px 6px;
+    color: #888;
+    font-size: 10px;
+    font-family: 'Fira Code', monospace;
+    outline: none;
+    cursor: pointer;
+}
+.sidebar-sort:focus { border-color: #333; }
 
 .sidebar-list {
     flex: 1;
@@ -645,3 +662,130 @@ body {
     }
     .ghost-canvas { display: none !important; }
 }
+
+/* ============================================
+   Graph Search
+   ============================================ */
+.graph-search-input {
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: #e0e0e0;
+    font-size: 11px;
+    font-family: 'Fira Code', monospace;
+    outline: none;
+    width: 150px;
+    transition: border-color 0.2s;
+}
+.graph-search-input:focus { border-color: #444; }
+.graph-search-input::placeholder { color: #444; }
+
+/* ============================================
+   Sidebar Item Row (with delete)
+   ============================================ */
+.sidebar-item-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.sidebar-item-row .sidebar-item { flex: 1; }
+.sidebar-item-delete {
+    background: none;
+    border: none;
+    color: #444;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.sidebar-item-delete:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+
+.sidebar-stats {
+    font-size: 10px;
+    color: #555;
+    padding: 6px 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   Modal Edit
+   ============================================ */
+.modal-edit-input {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 8px 10px;
+    color: #e0e0e0;
+    font-size: 12px;
+    font-family: 'Fira Sans', sans-serif;
+    outline: none;
+    margin-top: 6px;
+}
+.modal-edit-input:focus { border-color: #444; }
+.modal-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.modal-edit-btn {
+    background: #111;
+    border: 1px solid #222;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+.modal-edit-btn:hover { color: #e0e0e0; border-color: #444; }
+.modal-edit-btn {
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 6px 14px;
+    color: #ccc;
+    font-size: 11px;
+    cursor: pointer;
+    margin-top: 8px;
+}
+.modal-edit-btn:hover { background: #333; }
+
+/* ============================================
+   Mobile Responsive
+   ============================================ */
+@media (max-width: 768px) {
+    .home-sidebar { display: none; }
+    .home-main { width: 100% !important; }
+    .settings-page { padding: 16px; }
+    .modal-card { max-width: 100%; width: calc(100% - 16px); }
+    .graph-search-input { width: 100px; }
+}
+
+/* ============================================
+   Theme Toggle
+   ============================================ */
+.theme-toggle {
+    display: flex;
+    gap: 4px;
+    background: #0a0a0a;
+    border: 1px solid #1a1a1a;
+    border-radius: 4px;
+    padding: 2px;
+}
+.theme-toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #666;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+}
+.theme-toggle-btn.active { background: #e0e0e0; color: #000; }
+.theme-toggle-btn:hover:not(.active) { color: #ccc; }

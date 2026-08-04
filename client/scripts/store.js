@@ -15,10 +15,18 @@ const Store = (function () {
 
     function applySettings(s) {
         var root = document.documentElement;
-        root.setAttribute('data-theme', 'dark');
+        root.setAttribute('data-theme', s.theme || 'dark');
         var sizes = { small: '12px', medium: '13px', large: '14px' };
         root.style.setProperty('--font-size-base', sizes[s.fontSize] || '13px');
     }
 
-    return { get: get, set: set, applySettings: applySettings };
+    function toggleTheme() {
+        var current = state.settings.theme;
+        var next = current === 'dark' ? 'light' : 'dark';
+        state.settings.theme = next;
+        applySettings(state.settings);
+        return next;
+    }
+
+    return { get: get, set: set, applySettings: applySettings, toggleTheme: toggleTheme };
 })();

@@ -66,7 +66,10 @@ const ModalManager = (function () {
             <button class="modal-close" id="modal-close-btn">&times;</button>
 
             <div class="modal-header">
-                <h2 class="modal-title">${escapeHtml(nodeData.label)}</h2>
+                <div class="modal-title-row">
+                    <h2 class="modal-title">${escapeHtml(nodeData.label)}</h2>
+                    <button class="modal-edit-btn" id="modal-edit-btn" title="${t('editNode') || 'Редактировать'}">&#9998;</button>
+                </div>
                 <div class="modal-meta-row">
                     ${difficultyBar(nodeData.difficulty || 3)}
                     ${nodeData.time ? '<span class="modal-time-badge">' + escapeHtml(nodeData.time) + '</span>' : ''}
@@ -110,6 +113,16 @@ const ModalManager = (function () {
         `;
 
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+        document.getElementById('modal-edit-btn').addEventListener('click', function () {
+            closeModal();
+            setTimeout(function () {
+                ModalManager.openEditModal(nodeData, function (updated) {
+                    var node = currentGraphData ? currentGraphData.nodes.find(function (n) { return n.id === updated.id; }) : null;
+                    if (node) { node.label = updated.label; node.description = updated.description; }
+                    openModal(updated, currentGraphData);
+                });
+            }, 300);
+        });
         card.querySelectorAll('.modal-action-btn').forEach(function (btn) {
             btn.addEventListener('click', function () { handleAction(btn.getAttribute('data-action')); });
         });
@@ -227,5 +240,29 @@ const ModalManager = (function () {
         URL.revokeObjectURL(url);
     }
 
-    return { openModal: openModal, openModalById: openModalById, closeModal: closeModal };
+    function openEditModal(node, onSave) {
+        ensureDom();
+        var t = I18n.t;
+        var card = document.getElementById('modal-card');
+        if (!card) return;
+        card.innerHTML = '<div class="modal-header"><span class="modal-title">' + (t('editNode') || 'Редактировать узел') + '</span><button class="modal-close" id="modal-close">&times;</button></div>' +
+            '<div class="modal-body">' +
+            '<div class="modal-section"><div class="modal-field">' + (t('editLabel') || 'Название') +
+            '<input class="modal-edit-input" id="edit-label" value="' + escapeHtml(node.label) + '"></div></div>' +
+            '<div class="modal-section"><div class="modal-field">' + (t('editDescription') || 'Описание') +
+            '<textarea class="modal-edit-input" id="edit-desc" rows="4">' + escapeHtml(node.description || '') + '</textarea></div></div>' +
+            '</div>' +
+            '<div class="modal-actions"><button class="modal-action-btn" id="edit-save">' + (t('saveBtn') || 'Сохранить') + '</button></div>';
+        overlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        document.getElementById('modal-close').addEventListener('click', closeModal);
+        document.getElementById('edit-save').addEventListener('click', function () {
+            node.label = document.getElementById('edit-label').value.trim() || node.label;
+            node.description = document.getElementById('edit-desc').value.trim();
+            if (onSave) onSave(node);
+            closeModal();
+        });
+    }
+
+    return { openModal: openModal, openModalById: openModalById, closeModal: closeModal, openEditModal: openEditModal };
 })();
