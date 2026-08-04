@@ -294,7 +294,6 @@ const HomePage = (function () {
             <div id="top-bar" class="app-header" style="z-index:40;">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <button class="btn btn-sm" id="graph-back">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                         ${t('graphBack')}
                     </button>
                     <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${topic}</span>

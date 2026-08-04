@@ -155,34 +155,9 @@ const GraphRenderer = (function () {
         bgGrad.append('stop').attr('offset', '100%').attr('stop-color', '#000000');
         svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#vignette-bg)');
 
-        function addGrad(id, c1, c2) {
-            var g = defs.append('linearGradient').attr('id', id).attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
-            g.append('stop').attr('offset', '0%').attr('stop-color', c1);
-            g.append('stop').attr('offset', '100%').attr('stop-color', c2);
-        }
-        if (isDark) {
-            addGrad('card-gradient-root', '#111111', '#0a0a0a');
-            addGrad('card-gradient-l1', '#0d0d0d', '#111111');
-            addGrad('card-gradient-l2', '#0c0c0c', '#101010');
-            addGrad('card-gradient-l3', '#0b0b0b', '#0f0f0f');
-            addGrad('card-gradient-l4', '#0a0a0a', '#0e0e0e');
-        } else {
-            addGrad('card-gradient-root', '#ffffff', '#f5f5f5');
-            addGrad('card-gradient-l1', '#ffffff', '#f0f0f0');
-            addGrad('card-gradient-l2', '#ffffff', '#eeeeee');
-            addGrad('card-gradient-l3', '#f8f8f8', '#eeeeee');
-            addGrad('card-gradient-l4', '#f5f5f5', '#eeeeee');
-        }
-
         var linkGrad = defs.append('linearGradient').attr('id', 'link-gradient').attr('gradientUnits', 'userSpaceOnUse');
         linkGrad.append('stop').attr('offset', '0%').attr('stop-color', '#444444');
         linkGrad.append('stop').attr('offset', '100%').attr('stop-color', '#333333');
-
-        var glowFilter = defs.append('filter').attr('id', 'link-glow').attr('x', '-20%').attr('y', '-20%').attr('width', '140%').attr('height', '140%');
-        glowFilter.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', '0').attr('result', 'blur');
-        var feMerge = glowFilter.append('feMerge');
-        feMerge.append('feMergeNode').attr('in', 'blur');
-        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
         var graphGroup = svg.append('g').attr('class', 'graph-root');
         var positionKey = 'graph_pos_' + (topicName || '').replace(/\s+/g, '_');
@@ -197,7 +172,7 @@ const GraphRenderer = (function () {
         var hierarchyRoot = buildHierarchy(graphData.nodes, graphData.edges, rootId);
         var d3Hierarchy = d3.hierarchy(hierarchyRoot);
 
-        d3.tree().nodeSize([480, 200])(d3Hierarchy);
+        d3.tree().nodeSize([520, 240])(d3Hierarchy);
 
         // плоский массив
         var nodesFlat = [];
@@ -241,11 +216,15 @@ const GraphRenderer = (function () {
         // кривые
         var linkGroup = graphGroup.append('g').attr('class', 'links-layer');
         function curvePath(src, tgt) {
-            var sx = src.tx, sy = src.ty - src.cardHeight / 2;
-            var tx = tgt.tx, ty = tgt.ty + tgt.cardHeight / 2;
-            var midY = (sy + ty) / 2;
-            var cpx = (tx - sx) * 0.02;
-            return 'M ' + sx + ' ' + sy + ' C ' + (sx + cpx) + ' ' + midY + ', ' + (tx - cpx) + ' ' + midY + ', ' + tx + ' ' + ty;
+            var sx = src.tx, sy = src.ty + src.cardHeight / 2;
+            var tx = tgt.tx, ty = tgt.ty - tgt.cardHeight / 2;
+            var dy = ty - sy;
+            var dx = tx - sx;
+            var cp1y = sy + dy * 0.4;
+            var cp2y = sy + dy * 0.6;
+            var cp1x = sx + dx * 0.1;
+            var cp2x = tx - dx * 0.1;
+            return 'M ' + sx + ' ' + sy + ' C ' + cp1x + ' ' + cp1y + ', ' + cp2x + ' ' + cp2y + ', ' + tx + ' ' + ty;
         }
 
         var rootNode = nodeById[rootId];
@@ -275,17 +254,11 @@ const GraphRenderer = (function () {
             .attr('y', function (d) { return -d.cardHeight / 2; })
             .attr('rx', 2).attr('ry', 2)
             .attr('fill', function (d) {
-                if (d.depth === 0) return '#1a1a1a';
-                return '#111111';
+                if (d.depth === 0) return '#141414';
+                return '#0e0e0e';
             })
-            .attr('stroke', function (d) {
-                if (d.depth === 0) return '#555555';
-                var diff = d.difficulty || 3;
-                if (diff <= 2) return '#444444';
-                if (diff === 3) return '#333333';
-                return '#222222';
-            })
-            .attr('stroke-width', function (d) { return d.depth === 0 ? 1.5 : 1; });
+            .attr('stroke', '#222222')
+            .attr('stroke-width', 1);
 
         // заголовок
         nodeElements.append('text').attr('class', 'node-card-title')

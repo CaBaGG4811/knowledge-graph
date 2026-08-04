@@ -463,7 +463,7 @@ body {
     background: #0a0a0a;
     border-bottom: 1px solid #1a1a1a;
 }
-.node-card-rect { transition: stroke 0.3s, stroke-width 0.3s, filter 0.3s, opacity 0.3s; }
+.node-card-rect { transition: filter 0.3s, opacity 0.3s; }
 .knowledge-node { transition: opacity 0.3s; }
 .knowledge-node.dimmed { opacity: 0.1 !important; }
 .knowledge-node.dimmed .node-card-rect { filter: saturate(0.3); }
