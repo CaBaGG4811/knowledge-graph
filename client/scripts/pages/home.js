@@ -39,6 +39,10 @@ const HomePage = (function () {
                         <div class="sidebar-empty">${t('historyEmpty')}</div>
                     </div>
                     <div class="sidebar-footer">
+                        <button class="sidebar-settings-btn" id="sidebar-delete-all" title="${t('deleteAll') || 'Удалить все'}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                            <span>${t('deleteAll') || 'Удалить все'}</span>
+                        </button>
                         <button class="sidebar-settings-btn" id="sidebar-settings">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                             <span>${t('menuSettings')}</span>
@@ -131,6 +135,8 @@ const HomePage = (function () {
         document.getElementById('sidebar-settings').addEventListener('click', function () {
             window.location.hash = '#/settings';
         });
+        var delAllBtn = document.getElementById('sidebar-delete-all');
+        if (delAllBtn) delAllBtn.addEventListener('click', function () { deleteAllTrees(); });
         document.getElementById('sidebar-sort').addEventListener('change', function () {
             _sortMode = this.value;
             loadSidebarHistory();
@@ -513,6 +519,18 @@ const HomePage = (function () {
         if (!confirm(t('confirmDelete') || 'Удалить дерево?')) return;
         try {
             await API.del('/api/trees/' + id);
+            Toast.show(t('deleteSuccess') || 'Удалено', 'success');
+            loadSidebarHistory();
+        } catch (err) {
+            Toast.show(err.message, 'error');
+        }
+    }
+
+    async function deleteAllTrees() {
+        var t = I18n.t;
+        if (!confirm(t('confirmDeleteAll') || 'Удалить ВСЕ деревья?')) return;
+        try {
+            await API.del('/api/trees');
             Toast.show(t('deleteSuccess') || 'Удалено', 'success');
             loadSidebarHistory();
         } catch (err) {

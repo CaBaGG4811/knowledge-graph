@@ -3,7 +3,7 @@ let nextId = 1;
 
 module.exports = function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -26,6 +26,12 @@ module.exports = function handler(req, res) {
         trees.push(tree);
         if (trees.length > 50) trees = trees.slice(-50);
         return res.json({ id: tree.id, name: tree.name, topic: tree.topic, created_at: tree.created_at });
+    }
+
+    if (req.method === 'DELETE') {
+        trees = [];
+        nextId = 1;
+        return res.json({ ok: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
