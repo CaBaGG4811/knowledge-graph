@@ -20,9 +20,23 @@ module.exports = async function handler(req, res) {
 
     const trimmedTopic = topic.trim();
     const { llmUrl: userLlmUrl, llmModel: userLlmModel, llmApiKey: userLlmApiKey } = req.body || {};
-    const llmUrl = userLlmUrl || process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
-    const llmModel = userLlmModel || process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
+
+    function detectUrl(key) {
+        if (!key) return '';
+        if (key.startsWith('sk-ant-')) return 'https://api.anthropic.com/v1/messages';
+        if (key.startsWith('sk-')) return 'https://api.openai.com/v1/chat/completions';
+        if (key.startsWith('AIza')) return 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent';
+        return '';
+    }
+
+    const autoUrl = detectUrl(userLlmApiKey);
+    const llmUrl = userLlmUrl || autoUrl || process.env.LLM_URL || '';
+    const llmModel = userLlmModel || process.env.LLM_MODEL || 'gpt-4o-mini';
     const llmApiKey = userLlmApiKey || process.env.LLM_API_KEY || '';
+
+    if (!llmUrl) {
+        return res.status(400).json({ error: 'Введите API-ключ или URL сервера LLM в настройках.' });
+    }
 
     console.log('[Search] Searching for:', trimmedTopic);
     var searchResults = await webSearch(trimmedTopic);

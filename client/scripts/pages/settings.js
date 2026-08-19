@@ -18,19 +18,16 @@ const SettingsPage = (function () {
                 <h1 class="settings-title">${t('settingsTitle')}</h1>
 
                 <div class="settings-section">
-                    <div class="settings-section-title">LLM</div>
+                    <div class="settings-section-title">AI</div>
                     <div class="settings-group">
                         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
-                            <span class="settings-label">${t('settingLlmApiKey') || 'API-ключ (необязательно)'}</span>
-                            <input type="password" class="settings-input" id="settings-llm-apikey" placeholder="sk-... или оставьте пустым" value="${s.llmApiKey || ''}">
-                        </div>
-                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
-                            <span class="settings-label">${t('settingLlmUrl') || 'URL сервера'}</span>
-                            <input type="text" class="settings-input" id="settings-llm-url" placeholder="http://172.29.192.1:1234/v1/chat/completions" value="${s.llmUrl || ''}">
+                            <span class="settings-label">${t('settingLlmApiKey') || 'API-ключ'}</span>
+                            <input type="password" class="settings-input" id="settings-llm-apikey" placeholder="sk-..." value="${s.llmApiKey || ''}">
+                            <span style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${t('apiKeyHint') || 'Получите ключ в LM Studio или купите у OpenAI / Google / Anthropic'}</span>
                         </div>
                         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
                             <span class="settings-label">${t('settingLlmModel') || 'Модель'}</span>
-                            <input type="text" class="settings-input" id="settings-llm-model" placeholder="google/gemma-4-12b-qat" value="${s.llmModel || ''}">
+                            <input type="text" class="settings-input" id="settings-llm-model" placeholder="${t('modelPlaceholder') || 'gpt-4o-mini, gemini-2.0-flash, ...'}" value="${s.llmModel || ''}">
                         </div>
                     </div>
                 </div>
@@ -103,20 +100,13 @@ const SettingsPage = (function () {
             });
         });
 
-        var urlInput = document.getElementById('settings-llm-url');
-        var modelInput = document.getElementById('settings-llm-model');
         var apiKeyInput = document.getElementById('settings-llm-apikey');
+        var modelInput = document.getElementById('settings-llm-model');
 
         if (apiKeyInput) {
             apiKeyInput.addEventListener('input', function () {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(function () { saveSetting('llmApiKey', apiKeyInput.value); }, 500);
-            });
-        }
-        if (urlInput) {
-            urlInput.addEventListener('input', function () {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(function () { saveSetting('llmUrl', urlInput.value); }, 500);
             });
         }
         if (modelInput) {

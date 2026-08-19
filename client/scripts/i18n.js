@@ -103,7 +103,9 @@ const I18n = (function () {
             settingLanguage: 'Язык',
             settingLlmUrl: 'URL сервера',
             settingLlmModel: 'Модель',
-            settingLlmApiKey: 'API-ключ (необязательно)',
+            settingLlmApiKey: 'API-ключ',
+            apiKeyHint: 'Получите ключ в LM Studio или купите у OpenAI / Google / Anthropic',
+            modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
 
             // Errors
             llmError: 'LM Studio недоступен',
@@ -207,7 +209,9 @@ const I18n = (function () {
             settingLanguage: 'Language',
             settingLlmUrl: 'Server URL',
             settingLlmModel: 'Model',
-            settingLlmApiKey: 'API Key (optional)',
+            settingLlmApiKey: 'API Key',
+            apiKeyHint: 'Get a key from LM Studio or buy from OpenAI / Google / Anthropic',
+            modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
 
             llmError: 'LM Studio unavailable',
             jsonError: 'Model returned invalid JSON.',
@@ -310,7 +314,9 @@ const I18n = (function () {
             settingLanguage: '语言',
             settingLlmUrl: '服务器 URL',
             settingLlmModel: '模型',
-            settingLlmApiKey: 'API 密钥（可选）',
+            settingLlmApiKey: 'API 密钥',
+            apiKeyHint: '从 LM Studio 获取密钥，或购买 OpenAI / Google / Anthropic',
+            modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
 
             llmError: 'LM Studio 不可用',
             jsonError: '模型返回无效的 JSON。',
@@ -413,7 +419,9 @@ const I18n = (function () {
             settingLanguage: 'Idioma',
             settingLlmUrl: 'URL del servidor',
             settingLlmModel: 'Modelo',
-            settingLlmApiKey: 'Clave API (opcional)',
+            settingLlmApiKey: 'Clave API',
+            apiKeyHint: 'Obtén una clave en LM Studio o compra en OpenAI / Google / Anthropic',
+            modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
 
             llmError: 'LM Studio no disponible',
             jsonError: 'El modelo devolvió JSON inválido.',
@@ -516,7 +524,9 @@ const I18n = (function () {
             settingLanguage: 'भाषा',
             settingLlmUrl: 'सर्वर URL',
             settingLlmModel: 'मॉडल',
-            settingLlmApiKey: 'API कुंजी (वैकल्पिक)',
+            settingLlmApiKey: 'API कुंजी',
+            apiKeyHint: 'LM Studio से कुंजी प्राप्त करें या OpenAI / Google / Anthropic से खरीदें',
+            modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
 
             llmError: 'LM Studio उपलब्ध नहीं',
             jsonError: 'मॉडल ने अमान्य JSON दिया।',
@@ -619,7 +629,9 @@ const I18n = (function () {
             settingLanguage: 'اللغة',
             settingLlmUrl: 'رابط الخادم',
             settingLlmModel: 'النموذج',
-            settingLlmApiKey: 'مفتاح API (اختياري)',
+            settingLlmApiKey: 'مفتاح API',
+            apiKeyHint: 'احصل على مفتاح من LM Studio أو اشترِ من OpenAI / Google / Anthropic',
+            modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
 
             llmError: 'LM Studio غير متاح',
             jsonError: 'النموذج أرجع JSON غير صالح.',
