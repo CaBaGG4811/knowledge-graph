@@ -19,9 +19,10 @@ module.exports = async function handler(req, res) {
     }
 
     const trimmedTopic = topic.trim();
-    const { llmUrl: userLlmUrl, llmModel: userLlmModel } = req.body || {};
+    const { llmUrl: userLlmUrl, llmModel: userLlmModel, llmApiKey: userLlmApiKey } = req.body || {};
     const llmUrl = userLlmUrl || process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
     const llmModel = userLlmModel || process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
+    const llmApiKey = userLlmApiKey || process.env.LLM_API_KEY || '';
 
     console.log('[Search] Searching for:', trimmedTopic);
     var searchResults = await webSearch(trimmedTopic);
@@ -66,7 +67,7 @@ ${searchContext}
             ],
             temperature: 0.3,
             max_tokens: 8192
-        });
+        }, undefined, llmApiKey);
 
         if (!llmResponse.ok) {
             const errorText = await llmResponse.text();

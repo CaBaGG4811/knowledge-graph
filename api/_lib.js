@@ -1,16 +1,15 @@
 const http = require('http');
 const https = require('https');
 
-const LLM_API_KEY = process.env.LLM_API_KEY || '';
-
-function llmFetch(url, body, extraHeaders) {
+function llmFetch(url, body, extraHeaders, apiKey) {
     return new Promise((resolve, reject) => {
         const parsed = new URL(url);
         const isHttps = parsed.protocol === 'https:';
         const lib = isHttps ? https : http;
         const data = JSON.stringify(body);
         const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
-        if (LLM_API_KEY) headers['Authorization'] = 'Bearer ' + LLM_API_KEY;
+        const key = apiKey || process.env.LLM_API_KEY || '';
+        if (key) headers['Authorization'] = 'Bearer ' + key;
         if (extraHeaders) Object.assign(headers, extraHeaders);
         const req = lib.request({
             hostname: parsed.hostname,

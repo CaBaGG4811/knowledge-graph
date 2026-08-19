@@ -35,7 +35,7 @@ module.exports = async function handler(req, res) {
             ],
             temperature: 0.4,
             max_tokens: 4096
-        });
+        }, undefined, llmApiKey);
 
         if (!llmResponse.ok) return res.status(502).json({ error: 'LLM недоступен' });
 

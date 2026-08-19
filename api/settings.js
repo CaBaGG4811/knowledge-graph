@@ -4,7 +4,8 @@ const settings = {
     font_size: 'medium',
     lang: 'ru',
     llm_url: '',
-    llm_model: ''
+    llm_model: '',
+    llm_api_key: ''
 };
 
 const VALID_THEMES = ['dark', 'light'];
@@ -24,12 +25,13 @@ module.exports = function handler(req, res) {
             fontSize: settings.font_size,
             lang: settings.lang,
             llmUrl: settings.llm_url,
-            llmModel: settings.llm_model
+            llmModel: settings.llm_model,
+            llmApiKey: settings.llm_api_key
         });
     }
 
     if (req.method === 'PUT') {
-        const { theme, accentColor, fontSize, lang, llmUrl, llmModel } = req.body || {};
+        const { theme, accentColor, fontSize, lang, llmUrl, llmModel, llmApiKey } = req.body || {};
 
         if (theme !== undefined) {
             if (typeof theme === 'string' && VALID_THEMES.includes(theme)) settings.theme = theme;
@@ -49,6 +51,9 @@ module.exports = function handler(req, res) {
         if (llmModel !== undefined) {
             if (typeof llmModel === 'string' && llmModel.length <= 200) settings.llm_model = llmModel;
         }
+        if (llmApiKey !== undefined) {
+            if (typeof llmApiKey === 'string' && llmApiKey.length <= 500) settings.llm_api_key = llmApiKey;
+        }
 
         return res.json({
             theme: settings.theme,
@@ -56,7 +61,8 @@ module.exports = function handler(req, res) {
             fontSize: settings.font_size,
             lang: settings.lang,
             llmUrl: settings.llm_url,
-            llmModel: settings.llm_model
+            llmModel: settings.llm_model,
+            llmApiKey: settings.llm_api_key
         });
     }
 

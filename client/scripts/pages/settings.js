@@ -21,6 +21,10 @@ const SettingsPage = (function () {
                     <div class="settings-section-title">LLM</div>
                     <div class="settings-group">
                         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
+                            <span class="settings-label">${t('settingLlmApiKey') || 'API-ключ (необязательно)'}</span>
+                            <input type="password" class="settings-input" id="settings-llm-apikey" placeholder="sk-... или оставьте пустым" value="${s.llmApiKey || ''}">
+                        </div>
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
                             <span class="settings-label">${t('settingLlmUrl') || 'URL сервера'}</span>
                             <input type="text" class="settings-input" id="settings-llm-url" placeholder="http://172.29.192.1:1234/v1/chat/completions" value="${s.llmUrl || ''}">
                         </div>
@@ -101,7 +105,14 @@ const SettingsPage = (function () {
 
         var urlInput = document.getElementById('settings-llm-url');
         var modelInput = document.getElementById('settings-llm-model');
+        var apiKeyInput = document.getElementById('settings-llm-apikey');
 
+        if (apiKeyInput) {
+            apiKeyInput.addEventListener('input', function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function () { saveSetting('llmApiKey', apiKeyInput.value); }, 500);
+            });
+        }
         if (urlInput) {
             urlInput.addEventListener('input', function () {
                 clearTimeout(debounceTimer);

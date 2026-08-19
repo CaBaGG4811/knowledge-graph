@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
             ],
             temperature: 0.1,
             max_tokens: 200
-        });
+        }, undefined, llmApiKey);
 
         if (!llmResponse.ok) {
             return res.json({ valid: true, reason: '' });

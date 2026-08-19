@@ -103,6 +103,7 @@ const I18n = (function () {
             settingLanguage: 'Язык',
             settingLlmUrl: 'URL сервера',
             settingLlmModel: 'Модель',
+            settingLlmApiKey: 'API-ключ (необязательно)',
 
             // Errors
             llmError: 'LM Studio недоступен',
@@ -206,6 +207,7 @@ const I18n = (function () {
             settingLanguage: 'Language',
             settingLlmUrl: 'Server URL',
             settingLlmModel: 'Model',
+            settingLlmApiKey: 'API Key (optional)',
 
             llmError: 'LM Studio unavailable',
             jsonError: 'Model returned invalid JSON.',
@@ -308,6 +310,7 @@ const I18n = (function () {
             settingLanguage: '语言',
             settingLlmUrl: '服务器 URL',
             settingLlmModel: '模型',
+            settingLlmApiKey: 'API 密钥（可选）',
 
             llmError: 'LM Studio 不可用',
             jsonError: '模型返回无效的 JSON。',
@@ -410,6 +413,7 @@ const I18n = (function () {
             settingLanguage: 'Idioma',
             settingLlmUrl: 'URL del servidor',
             settingLlmModel: 'Modelo',
+            settingLlmApiKey: 'Clave API (opcional)',
 
             llmError: 'LM Studio no disponible',
             jsonError: 'El modelo devolvió JSON inválido.',
@@ -512,6 +516,7 @@ const I18n = (function () {
             settingLanguage: 'भाषा',
             settingLlmUrl: 'सर्वर URL',
             settingLlmModel: 'मॉडल',
+            settingLlmApiKey: 'API कुंजी (वैकल्पिक)',
 
             llmError: 'LM Studio उपलब्ध नहीं',
             jsonError: 'मॉडल ने अमान्य JSON दिया।',
@@ -614,6 +619,7 @@ const I18n = (function () {
             settingLanguage: 'اللغة',
             settingLlmUrl: 'رابط الخادم',
             settingLlmModel: 'النموذج',
+            settingLlmApiKey: 'مفتاح API (اختياري)',
 
             llmError: 'LM Studio غير متاح',
             jsonError: 'النموذج أرجع JSON غير صالح.',
