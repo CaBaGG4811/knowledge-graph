@@ -12,3 +12,5 @@ error.log
 start.bat
 test_search.js
 .vercel/project.json
+
+.vercel
