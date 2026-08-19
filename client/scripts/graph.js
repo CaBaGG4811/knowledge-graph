@@ -1,24 +1,157 @@
-/* graph.js — D3.js модуль рендера деревьев знаний */
+/* graph.js — D3.js модуль рендера деревьев знаний с темами */
 const GraphRenderer = (function () {
     'use strict';
 
-    var CARD_SIZES = {
-        0: { width: 240, height: 80 },
-        1: { width: 200, height: 68 },
-        2: { width: 180, height: 60 },
-        3: { width: 160, height: 52 },
-        4: { width: 140, height: 48 }
+    /* ============================================
+       THEMES
+       ============================================ */
+    var THEMES = {
+        sharp: {
+            name: 'Sharp',
+            bg: ['#0a0a0a', '#000000'],
+            nodeFill: '#111111',
+            nodeFillRoot: '#1a1a1a',
+            nodeStroke: '#2a2a2a',
+            nodeStrokeWidth: 1.5,
+            titleColor: '#e8e8e8',
+            descColor: '#777777',
+            metaColor: '#555555',
+            linkColor: '#333333',
+            linkWidth: 1.5,
+            linkWidthRoot: 2.5,
+            linkOpacity: 0.5,
+            accentRoot: '#4a9eff',
+            accentMid: '#333333',
+            accentLeaf: '#222222',
+            cornerRadius: 1,
+            shadow: false,
+            glow: false
+        },
+        neon: {
+            name: 'Neon',
+            bg: ['#050510', '#000008'],
+            nodeFill: '#0c0c1a',
+            nodeFillRoot: '#10102a',
+            nodeStroke: '#00ffcc',
+            nodeStrokeWidth: 1.2,
+            titleColor: '#00ffcc',
+            descColor: '#66ffdd',
+            metaColor: '#00aa88',
+            linkColor: '#00ffcc',
+            linkWidth: 1.2,
+            linkWidthRoot: 2,
+            linkOpacity: 0.45,
+            accentRoot: '#ff0066',
+            accentMid: '#00ffcc',
+            accentLeaf: '#6633ff',
+            cornerRadius: 0,
+            shadow: true,
+            glow: true,
+            glowColor: '#00ffcc'
+        },
+        glass: {
+            name: 'Glass',
+            bg: ['#111118', '#0a0a10'],
+            nodeFill: 'rgba(255,255,255,0.04)',
+            nodeFillRoot: 'rgba(255,255,255,0.07)',
+            nodeStroke: 'rgba(255,255,255,0.12)',
+            nodeStrokeWidth: 1,
+            titleColor: '#e0e0e0',
+            descColor: '#999999',
+            metaColor: '#777777',
+            linkColor: 'rgba(255,255,255,0.1)',
+            linkWidth: 1,
+            linkWidthRoot: 1.8,
+            linkOpacity: 0.4,
+            accentRoot: '#a78bfa',
+            accentMid: '#60a5fa',
+            accentLeaf: '#34d399',
+            cornerRadius: 6,
+            shadow: true,
+            glow: false
+        },
+        cyber: {
+            name: 'Cyber',
+            bg: ['#0a000a', '#000005'],
+            nodeFill: '#0f0f1f',
+            nodeFillRoot: '#1a1030',
+            nodeStroke: '#ff3366',
+            nodeStrokeWidth: 1.5,
+            titleColor: '#ff3366',
+            descColor: '#ff6699',
+            metaColor: '#cc2255',
+            linkColor: '#ff3366',
+            linkWidth: 1.5,
+            linkWidthRoot: 2.5,
+            linkOpacity: 0.4,
+            accentRoot: '#ffff00',
+            accentMid: '#ff3366',
+            accentLeaf: '#00ccff',
+            cornerRadius: 0,
+            shadow: true,
+            glow: true,
+            glowColor: '#ff3366'
+        },
+        minimal: {
+            name: 'Minimal',
+            bg: ['#fafafa', '#ffffff'],
+            nodeFill: '#ffffff',
+            nodeFillRoot: '#f5f5f5',
+            nodeStroke: '#222222',
+            nodeStrokeWidth: 2,
+            titleColor: '#111111',
+            descColor: '#666666',
+            metaColor: '#999999',
+            linkColor: '#cccccc',
+            linkWidth: 1.5,
+            linkWidthRoot: 2.5,
+            linkOpacity: 0.6,
+            accentRoot: '#111111',
+            accentMid: '#444444',
+            accentLeaf: '#888888',
+            cornerRadius: 2,
+            shadow: false,
+            glow: false
+        },
+        ocean: {
+            name: 'Ocean',
+            bg: ['#020c1b', '#010a15'],
+            nodeFill: '#0a192f',
+            nodeFillRoot: '#112240',
+            nodeStroke: '#64ffda',
+            nodeStrokeWidth: 1.2,
+            titleColor: '#ccd6f6',
+            descColor: '#8892b0',
+            metaColor: '#5a6a8a',
+            linkColor: '#233554',
+            linkWidth: 1.5,
+            linkWidthRoot: 2.5,
+            linkOpacity: 0.5,
+            accentRoot: '#64ffda',
+            accentMid: '#5eead4',
+            accentLeaf: '#38bdf8',
+            cornerRadius: 3,
+            shadow: true,
+            glow: false
+        }
     };
 
-    var CARD_STYLES = {
-        0: { fill: '#1a1a1a', stroke: '#444444', strokeWidth: 1.5, titleColor: '#e0e0e0', descColor: '#888888' },
-        1: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' },
-        2: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' },
-        3: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' },
-        4: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' }
+    var SHAPES = {
+        rectangle: { rx: 0, ry: 0 },
+        sharp: { rx: 1, ry: 1 },
+        rounded: { rx: 8, ry: 8 },
+        pill: { rx: 999, ry: 999 }
     };
 
+    var currentTheme = 'sharp';
+    var currentShape = 'sharp';
     var currentEdgesProcessed = [];
+
+    /* ============================================
+       HELPERS
+       ============================================ */
+
+    function getTheme() { return THEMES[currentTheme] || THEMES.sharp; }
 
     function truncateText(text, maxLen) {
         if (!text) return '';
@@ -32,12 +165,20 @@ const GraphRenderer = (function () {
         return (sentences[0] + sentences[1]).trim();
     }
 
+    var CARD_SIZES = {
+        0: { width: 260, height: 88 },
+        1: { width: 220, height: 74 },
+        2: { width: 190, height: 64 },
+        3: { width: 170, height: 56 },
+        4: { width: 150, height: 50 }
+    };
+
     function computeCardWidth(depth, titleLen, descLen) {
         var base = CARD_SIZES[depth] || CARD_SIZES[4];
         var w = base.width;
         if (titleLen > 16) w += (titleLen - 16) * 2;
         if (descLen > 35) w += (descLen - 35) * 1;
-        return Math.min(290, Math.max(w, base.width));
+        return Math.min(320, Math.max(w, base.width));
     }
 
     function findRootNodeId(nodes, edges) {
@@ -99,6 +240,7 @@ const GraphRenderer = (function () {
 
     function applyHoverEffect(hoveredNodeId) {
         var connected = getConnectedNodeIds(hoveredNodeId);
+        var th = getTheme();
         d3.selectAll('.knowledge-node').each(function (d) {
             var el = d3.select(this);
             el.classed('dimmed', !connected.has(d.id)).classed('highlighted', d.id === hoveredNodeId);
@@ -114,12 +256,7 @@ const GraphRenderer = (function () {
     }
 
     function highlightConnections(nodeId, nodesFlat) {
-        var connected = new Set();
-        connected.add(nodeId);
-        currentEdgesProcessed.forEach(function (e) {
-            if (e.source.id === nodeId) connected.add(e.target.id);
-            if (e.target.id === nodeId) connected.add(e.source.id);
-        });
+        var connected = getConnectedNodeIds(nodeId);
         d3.selectAll('.knowledge-node').each(function (d) {
             var el = d3.select(this);
             el.classed('dimmed', !connected.has(d.id));
@@ -133,6 +270,65 @@ const GraphRenderer = (function () {
         }, 3000);
     }
 
+    /* ============================================
+       NODE SHAPE DRAWING
+       ============================================ */
+
+    function drawNodeShape(sel, d, th, depth) {
+        var w = d.cardWidth;
+        var h = d.cardHeight;
+        var shape = SHAPES[currentShape] || SHAPES.sharp;
+        var rx = shape.rx;
+        var ry = shape.ry;
+
+        // root accent bar
+        if (depth === 0) {
+            sel.append('rect')
+                .attr('class', 'node-accent-bar')
+                .attr('width', w).attr('height', 3)
+                .attr('x', -w / 2).attr('y', -h / 2)
+                .attr('fill', th.accentRoot)
+                .attr('rx', rx).attr('ry', ry);
+        }
+
+        // main rect
+        sel.append('rect')
+            .attr('class', 'node-card-rect')
+            .attr('width', w).attr('height', h)
+            .attr('x', -w / 2).attr('y', -h / 2)
+            .attr('rx', rx).attr('ry', ry)
+            .attr('fill', depth === 0 ? th.nodeFillRoot : th.nodeFill)
+            .attr('stroke', th.nodeStroke)
+            .attr('stroke-width', th.nodeStrokeWidth);
+
+        // glow effect
+        if (th.glow && depth <= 1) {
+            sel.append('rect')
+                .attr('class', 'node-glow')
+                .attr('width', w + 6).attr('height', h + 6)
+                .attr('x', -w / 2 - 3).attr('y', -h / 2 - 3)
+                .attr('rx', rx + 2).attr('ry', ry + 2)
+                .attr('fill', 'none')
+                .attr('stroke', th.glowColor || th.nodeStroke)
+                .attr('stroke-width', 1)
+                .attr('opacity', 0.3);
+        }
+
+        // shadow
+        if (th.shadow) {
+            sel.insert('rect', ':first-child')
+                .attr('class', 'node-shadow')
+                .attr('width', w).attr('height', h)
+                .attr('x', -w / 2 + 2).attr('y', -h / 2 + 3)
+                .attr('rx', rx).attr('ry', ry)
+                .attr('fill', 'rgba(0,0,0,0.35)');
+        }
+    }
+
+    /* ============================================
+       RENDER
+       ============================================ */
+
     function renderGraph(graphData, topicName) {
         var container = document.getElementById('graph-container');
         if (!container) return;
@@ -140,24 +336,27 @@ const GraphRenderer = (function () {
         currentEdgesProcessed = [];
         if (!graphData || !graphData.nodes || graphData.nodes.length === 0) return;
 
+        var th = getTheme();
+        var isDark = currentTheme !== 'minimal';
         var width = window.innerWidth;
         var height = window.innerHeight;
 
         var svg = d3.select('#graph-container').append('svg').attr('width', width).attr('height', height);
 
-        var isDark = (Store.get('settings') || {}).theme !== 'light';
-        var styles = CARD_STYLES;
-
+        // defs
         var defs = svg.append('defs');
 
         var bgGrad = defs.append('radialGradient').attr('id', 'vignette-bg').attr('cx', '50%').attr('cy', '55%').attr('r', '55%');
-        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', '#0a0a0a');
-        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', '#000000');
+        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', th.bg[0]);
+        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', th.bg[1]);
         svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#vignette-bg)');
 
-        var linkGrad = defs.append('linearGradient').attr('id', 'link-gradient').attr('gradientUnits', 'userSpaceOnUse');
-        linkGrad.append('stop').attr('offset', '0%').attr('stop-color', '#444444');
-        linkGrad.append('stop').attr('offset', '100%').attr('stop-color', '#333333');
+        // glow filter
+        if (th.glow) {
+            var filter = defs.append('filter').attr('id', 'glow').attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+            filter.append('feGaussianBlur').attr('stdDeviation', '3').attr('result', 'blur');
+            filter.append('feMerge').selectAll('feMergeNode').data(['blur', 'SourceGraphic']).enter().append('feMergeNode').attr('in', function (d) { return d; });
+        }
 
         var graphGroup = svg.append('g').attr('class', 'graph-root');
         var positionKey = 'graph_pos_' + (topicName || '').replace(/\s+/g, '_');
@@ -167,14 +366,13 @@ const GraphRenderer = (function () {
         });
         svg.call(zoomBehavior);
 
-        // дерево
+        // tree layout
         var rootId = findRootNodeId(graphData.nodes, graphData.edges);
         var hierarchyRoot = buildHierarchy(graphData.nodes, graphData.edges, rootId);
         var d3Hierarchy = d3.hierarchy(hierarchyRoot);
+        d3.tree().nodeSize([560, 260])(d3Hierarchy);
 
-        d3.tree().nodeSize([520, 240])(d3Hierarchy);
-
-        // плоский массив
+        // flat nodes
         var nodesFlat = [];
         d3Hierarchy.descendants().forEach(function (d) {
             var orig = d.data;
@@ -190,7 +388,7 @@ const GraphRenderer = (function () {
             });
         });
 
-        // центрируем
+        // center
         var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         nodesFlat.forEach(function (n) {
             if (n.tx < minX) minX = n.tx;
@@ -205,6 +403,7 @@ const GraphRenderer = (function () {
         var nodeById = {};
         nodesFlat.forEach(function (n) { nodeById[n.id] = n; });
 
+        // edges
         var edgesProcessed = [];
         d3Hierarchy.links().forEach(function (link) {
             if (nodeById[link.source.data.id] && nodeById[link.target.data.id]) {
@@ -213,7 +412,7 @@ const GraphRenderer = (function () {
         });
         currentEdgesProcessed = edgesProcessed;
 
-        // кривые
+        // draw links
         var linkGroup = graphGroup.append('g').attr('class', 'links-layer');
         function curvePath(src, tgt) {
             var sx = src.tx, sy = src.ty + src.cardHeight / 2;
@@ -227,62 +426,49 @@ const GraphRenderer = (function () {
             return 'M ' + sx + ' ' + sy + ' C ' + cp1x + ' ' + cp1y + ', ' + cp2x + ' ' + cp2y + ', ' + tx + ' ' + ty;
         }
 
-        var rootNode = nodeById[rootId];
-        if (rootNode) {
-            linkGrad.attr('x1', rootNode.tx).attr('y1', rootNode.ty).attr('x2', rootNode.tx).attr('y2', rootNode.ty - 300);
-        }
-
         var linkElements = linkGroup.selectAll('path').data(edgesProcessed).enter()
             .append('path').attr('class', 'graph-link')
-            .attr('stroke', '#555555')
-            .attr('stroke-width', function (d) { return d.source.depth === 0 ? 2 : 1.5; })
+            .attr('stroke', th.linkColor)
+            .attr('stroke-width', function (d) { return d.source.depth === 0 ? th.linkWidthRoot : th.linkWidth; })
             .attr('stroke-opacity', 0)
             .attr('d', function (d) { return curvePath(d.source, d.target); });
 
-        // карточки
+        // draw nodes
         var nodeGroup = graphGroup.append('g').attr('class', 'nodes-layer');
         var nodeElements = nodeGroup.selectAll('g').data(nodesFlat).enter()
             .append('g').attr('class', 'knowledge-node')
             .attr('opacity', 0)
             .attr('transform', function (d) { return 'translate(' + d.tx + ',' + d.ty + ')'; });
 
-        // основной rect — строгий стиль
-        nodeElements.append('rect').attr('class', 'node-card-rect')
-            .attr('width', function (d) { return d.cardWidth; })
-            .attr('height', function (d) { return d.cardHeight; })
-            .attr('x', function (d) { return -d.cardWidth / 2; })
-            .attr('y', function (d) { return -d.cardHeight / 2; })
-            .attr('rx', 2).attr('ry', 2)
-            .attr('fill', function (d) {
-                if (d.depth === 0) return '#141414';
-                return '#0e0e0e';
-            })
-            .attr('stroke', '#222222')
-            .attr('stroke-width', 1);
+        // draw shapes
+        nodeElements.each(function (d) {
+            drawNodeShape(d3.select(this), d, th, d.depth);
+        });
 
-        // заголовок
+        // title
         nodeElements.append('text').attr('class', 'node-card-title')
-            .text(function (d) { return truncateText(d.label, 22); })
+            .text(function (d) { return truncateText(d.label, 24); })
             .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
             .attr('x', 0)
             .attr('y', function (d) { return d.depth === 0 ? -8 : -6; })
-            .attr('font-size', function (d) { return d.depth === 0 ? '11px' : d.depth === 1 ? '10px' : '9px'; })
-            .attr('fill', function (d) { return isDark ? '#e0e0e0' : '#1a1a1a'; });
+            .attr('font-size', function (d) { return d.depth === 0 ? '12px' : d.depth === 1 ? '11px' : '10px'; })
+            .attr('fill', th.titleColor)
+            .attr('font-weight', function (d) { return d.depth === 0 ? '700' : '600'; });
 
-        // описание (1 строка)
+        // description
         nodeElements.append('text').attr('class', 'node-card-desc')
             .text(function (d) {
                 if (!d.description) return '';
-                return truncateText(shortDescription(d.description), 30);
+                return truncateText(shortDescription(d.description), 32);
             })
             .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
             .attr('x', 0)
             .attr('y', function (d) { return d.depth === 0 ? 8 : 7; })
-            .attr('font-size', '7px')
-            .attr('fill', function (d) { return isDark ? '#888888' : '#666666'; })
-            .attr('opacity', function (d) { return d.description ? 0.8 : 0; });
+            .attr('font-size', '8px')
+            .attr('fill', th.descColor)
+            .attr('opacity', function (d) { return d.description ? 0.85 : 0; });
 
-        // мета: время (снизу)
+        // meta (time)
         nodeElements.append('text').attr('class', 'node-card-meta')
             .text(function (d) {
                 var parts = [];
@@ -293,10 +479,10 @@ const GraphRenderer = (function () {
             .attr('x', 0)
             .attr('y', function (d) { return d.cardHeight / 2 - 8; })
             .attr('font-size', '7px')
-            .attr('fill', function (d) { return isDark ? '#666666' : '#999999'; })
+            .attr('fill', th.metaColor)
             .attr('opacity', 0.7);
 
-        // шкала сложности (точки снизу-слева)
+        // difficulty dots
         nodeElements.each(function (d) {
             var g = d3.select(this);
             var diff = d.difficulty || 3;
@@ -306,17 +492,17 @@ const GraphRenderer = (function () {
                 g.append('circle')
                     .attr('cx', startX + i * 8)
                     .attr('cy', y)
-                    .attr('r', 2)
+                    .attr('r', 2.5)
                     .attr('fill', function () {
-                        if (i >= diff) return '#1a1a1a';
-                        if (diff <= 2) return '#666666';
-                        if (diff === 3) return '#555555';
-                        return '#444444';
+                        if (i >= diff) return th.nodeStroke + '33';
+                        if (diff <= 2) return th.accentMid;
+                        if (diff === 3) return th.accentMid + 'cc';
+                        return th.accentLeaf || th.accentMid + '88';
                     });
             }
         });
 
-        // клик — модалка
+        // click → modal
         nodeElements.on('click', function (event, d) {
             event.stopPropagation();
             ModalManager.openModal(d, graphData);
@@ -326,7 +512,7 @@ const GraphRenderer = (function () {
         nodeElements.on('mouseenter', function (event, d) { applyHoverEffect(d.id); })
             .on('mouseleave', function () { removeHoverEffect(); });
 
-        // анимация волнами
+        // wave animation
         var nodesByDepth = {};
         nodesFlat.forEach(function (n) {
             if (!nodesByDepth[n.depth]) nodesByDepth[n.depth] = [];
@@ -334,11 +520,11 @@ const GraphRenderer = (function () {
         });
         var sortedDepths = Object.keys(nodesByDepth).map(Number).sort(function (a, b) { return a - b; });
         var cumDelay = 0;
-        var waveDelay = 180;
+        var waveDelay = 160;
 
         sortedDepths.forEach(function (dep) {
             nodesByDepth[dep].forEach(function (nd, idx) {
-                var delay = waveDelay + cumDelay + idx * 40;
+                var delay = waveDelay + cumDelay + idx * 35;
                 setTimeout(function () {
                     var sel = nodeElements.filter(function (n) { return n.id === nd.id; });
                     var sx = width / 2, sy = height / 2;
@@ -346,60 +532,48 @@ const GraphRenderer = (function () {
                         var pl = d3Hierarchy.links().find(function (l) { return l.target.data.id === nd.id; });
                         if (pl) { sx = nodeById[pl.source.data.id].tx; sy = nodeById[pl.source.data.id].ty; }
                     }
-                    sel.attr('transform', 'translate(' + sx + ',' + sy + ') scale(0.2)').attr('opacity', 0)
-                        .transition().duration(400).ease(d3.easeCubicOut)
+                    sel.attr('transform', 'translate(' + sx + ',' + sy + ') scale(0.15)').attr('opacity', 0)
+                        .transition().duration(420).ease(d3.easeCubicOut)
                         .attr('opacity', 1).attr('transform', 'translate(' + nd.tx + ',' + nd.ty + ') scale(1)');
                 }, delay);
             });
-            cumDelay += nodesByDepth[dep].length * 40 + 350;
+            cumDelay += nodesByDepth[dep].length * 35 + 320;
         });
 
-        // линии
+        // link animation
         var linksByDepth = {};
         edgesProcessed.forEach(function (e) {
             if (!linksByDepth[e.source.depth]) linksByDepth[e.source.depth] = [];
             linksByDepth[e.source.depth].push(e);
         });
         var sortedLinkDeps = Object.keys(linksByDepth).map(Number).sort(function (a, b) { return a - b; });
-        var linkDelay = waveDelay + 250;
+        var linkDelay = waveDelay + 220;
         sortedLinkDeps.forEach(function (dep) {
             setTimeout(function () {
                 linkElements.filter(function (l) { return l.source.depth === dep; }).each(function () {
                     var pathEl = d3.select(this);
                     var totalLen = this.getTotalLength();
                     pathEl.attr('stroke-dasharray', totalLen).attr('stroke-dashoffset', totalLen)
-                        .attr('stroke-opacity', 0.4)
-                        .transition().duration(750).ease(d3.easeQuadOut).attr('stroke-dashoffset', 0);
+                        .attr('stroke-opacity', th.linkOpacity)
+                        .transition().duration(700).ease(d3.easeQuadOut).attr('stroke-dashoffset', 0);
                 });
             }, linkDelay);
-            linkDelay += 250;
+            linkDelay += 220;
         });
 
-        // фокус на корень
-        var totalAnimTime = waveDelay + sortedDepths.length * 400 + 500;
+        // focus on root
+        var totalAnimTime = waveDelay + sortedDepths.length * 380 + 400;
         setTimeout(function () {
-            if (!rootNode) return;
+            if (!nodeById[rootId]) return;
             var scale = 0.85;
-            var tx = width / 2 - rootNode.tx * scale;
-            var ty = height / 2 - rootNode.ty * scale;
+            var tx = width / 2 - nodeById[rootId].tx * scale;
+            var ty = height / 2 - nodeById[rootId].ty * scale;
             var transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
             svg.transition().duration(800).ease(d3.easeCubicInOut).call(zoomBehavior.transform, transform);
         }, totalAnimTime);
 
-        // публичный метод для подсветки связей
-        window._graphHighlight = function (nodeId) {
-            highlightConnections(nodeId, nodesFlat);
-        };
-
-        // сохранение позиции
-        var savedPos = null;
-        try { savedPos = JSON.parse(localStorage.getItem(positionKey)); } catch (ex) {}
-        if (savedPos) {
-            var initTransform = d3.zoomIdentity.translate(savedPos.x, savedPos.y).scale(savedPos.k);
-            svg.call(zoomBehavior.transform, initTransform);
-        }
-
-        // поиск по графу
+        // public methods
+        window._graphHighlight = function (nodeId) { highlightConnections(nodeId, nodesFlat); };
         window._graphSearch = function (query) {
             if (!query) { removeHoverEffect(); return; }
             var q = query.toLowerCase();
@@ -409,7 +583,6 @@ const GraphRenderer = (function () {
             });
         };
 
-        // публичные методы
         window._graphExportPdf = function () {
             var svgEl = document.querySelector('#graph-container svg');
             if (!svgEl) return;
@@ -418,7 +591,7 @@ const GraphRenderer = (function () {
                 return;
             }
             Toast.show(I18n.t('pdfExporting') || 'Exporting PDF...', 'info');
-            html2canvas(svgEl, { backgroundColor: '#000000', scale: 2 }).then(function (canvas) {
+            html2canvas(svgEl, { backgroundColor: th.bg[1], scale: 2 }).then(function (canvas) {
                 var imgData = canvas.toDataURL('image/png');
                 var pdf = new jspdf.jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
@@ -433,15 +606,125 @@ const GraphRenderer = (function () {
             if (newData.label !== undefined) node.label = newData.label;
             if (newData.description !== undefined) node.description = newData.description;
             var sel = nodeElements.filter(function (n) { return n.id === nodeId; });
-            sel.select('.node-card-title').text(function (d) { return truncateText(d.label, 22); });
+            sel.select('.node-card-title').text(function (d) { return truncateText(d.label, 24); });
             sel.select('.node-card-desc').text(function (d) {
                 if (!d.description) return '';
-                return truncateText(shortDescription(d.description), 30);
+                return truncateText(shortDescription(d.description), 32);
             });
         };
 
         window._getCurrentGraphData = function () { return graphData; };
+
+        // render toolbar
+        renderToolbar();
     }
 
-    return { renderGraph: renderGraph };
+    /* ============================================
+       STYLE TOOLBAR
+       ============================================ */
+
+    function renderToolbar() {
+        var existing = document.getElementById('graph-toolbar');
+        if (existing) existing.remove();
+
+        var toolbar = document.createElement('div');
+        toolbar.id = 'graph-toolbar';
+        toolbar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;gap:6px;padding:8px 14px;background:rgba(20,20,20,0.92);border:1px solid rgba(255,255,255,0.08);border-radius:12px;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.5);';
+
+        // theme selector
+        var themeLabel = document.createElement('span');
+        themeLabel.style.cssText = 'color:#888;font-size:11px;align-self:center;margin-right:4px;';
+        themeLabel.textContent = 'THEME';
+        toolbar.appendChild(themeLabel);
+
+        Object.keys(THEMES).forEach(function (key) {
+            var btn = document.createElement('button');
+            btn.style.cssText = 'border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer;font-weight:600;letter-spacing:0.5px;transition:all 0.15s;';
+            btn.textContent = THEMES[key].name;
+            btn.dataset.theme = key;
+
+            if (key === currentTheme) {
+                btn.style.background = THEMES[key].accentRoot;
+                btn.style.color = '#000';
+            } else {
+                btn.style.background = 'rgba(255,255,255,0.06)';
+                btn.style.color = '#aaa';
+            }
+
+            btn.addEventListener('mouseenter', function () { btn.style.background = 'rgba(255,255,255,0.12)'; });
+            btn.addEventListener('mouseleave', function () {
+                btn.style.background = key === currentTheme ? THEMES[key].accentRoot : 'rgba(255,255,255,0.06)';
+                btn.style.color = key === currentTheme ? '#000' : '#aaa';
+            });
+
+            btn.addEventListener('click', function () {
+                currentTheme = key;
+                var gd = window._getCurrentGraphData();
+                if (gd) renderGraph(gd, document.querySelector('.home-topic-name') ? document.querySelector('.home-topic-name').textContent : '');
+            });
+
+            toolbar.appendChild(btn);
+        });
+
+        // separator
+        var sep = document.createElement('div');
+        sep.style.cssText = 'width:1px;background:rgba(255,255,255,0.1);margin:0 6px;align-self:stretch;';
+        toolbar.appendChild(sep);
+
+        // shape selector
+        var shapeLabel = document.createElement('span');
+        shapeLabel.style.cssText = 'color:#888;font-size:11px;align-self:center;margin-right:4px;';
+        shapeLabel.textContent = 'SHAPE';
+        toolbar.appendChild(shapeLabel);
+
+        var shapeIcons = { rectangle: '▬', sharp: '▮', rounded: '▢', pill: '◎' };
+        Object.keys(SHAPES).forEach(function (key) {
+            var btn = document.createElement('button');
+            btn.style.cssText = 'border:none;border-radius:6px;padding:5px 8px;font-size:13px;cursor:pointer;transition:all 0.15s;';
+            btn.textContent = shapeIcons[key] || key;
+            btn.dataset.shape = key;
+            btn.title = key;
+
+            if (key === currentShape) {
+                btn.style.background = 'rgba(255,255,255,0.15)';
+                btn.style.color = '#fff';
+            } else {
+                btn.style.background = 'rgba(255,255,255,0.04)';
+                btn.style.color = '#777';
+            }
+
+            btn.addEventListener('click', function () {
+                currentShape = key;
+                var gd = window._getCurrentGraphData();
+                if (gd) renderGraph(gd, document.querySelector('.home-topic-name') ? document.querySelector('.home-topic-name').textContent : '');
+            });
+
+            toolbar.appendChild(btn);
+        });
+
+        document.body.appendChild(toolbar);
+    }
+
+    /* ============================================
+       PUBLIC API
+       ============================================ */
+
+    function setTheme(theme) {
+        if (THEMES[theme]) currentTheme = theme;
+    }
+
+    function setShape(shape) {
+        if (SHAPES[shape]) currentShape = shape;
+    }
+
+    function getThemes() { return THEMES; }
+    function getShapes() { return SHAPES; }
+
+    return {
+        renderGraph: renderGraph,
+        setTheme: setTheme,
+        setShape: setShape,
+        getThemes: getThemes,
+        getShapes: getShapes
+    };
 })();

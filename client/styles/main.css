@@ -449,16 +449,23 @@ body {
     border-bottom: 1px solid #1a1a1a;
 }
 .node-card-rect { transition: filter 0.3s, opacity 0.3s; }
+.node-accent-bar { pointer-events: none; }
+.node-glow { pointer-events: none; animation: glowPulse 2s ease-in-out infinite; }
+.node-shadow { pointer-events: none; }
+@keyframes glowPulse { 0%,100% { opacity: 0.2; } 50% { opacity: 0.5; } }
 .knowledge-node { transition: opacity 0.3s; }
-.knowledge-node.dimmed { opacity: 0.1 !important; }
-.knowledge-node.dimmed .node-card-rect { filter: saturate(0.3); }
-.knowledge-node.highlighted .node-card-rect { filter: brightness(1.1); }
+.knowledge-node.dimmed { opacity: 0.08 !important; }
+.knowledge-node.dimmed .node-card-rect { filter: saturate(0.2) brightness(0.5); }
+.knowledge-node.highlighted .node-card-rect { filter: brightness(1.15) saturate(1.2); }
+.knowledge-node.highlighted .node-glow { opacity: 0.6; }
 .graph-link { fill: none; transition: stroke-opacity 0.3s; }
-.graph-link.dimmed { stroke-opacity: 0.03 !important; }
+.graph-link.dimmed { stroke-opacity: 0.02 !important; }
 .node-card-title, .node-card-desc, .node-card-meta { pointer-events: none; font-family: 'Fira Code', monospace; }
 .node-card-title { font-weight: 600; letter-spacing: 0.3px; }
 .node-card-desc { font-weight: 300; letter-spacing: 0.2px; }
 .node-card-meta { letter-spacing: 0.5px; text-transform: uppercase; font-size: 6px; }
+#graph-toolbar button:hover { transform: scale(1.05); }
+#graph-toolbar button:active { transform: scale(0.95); }
 
 /* ============================================
    Settings
