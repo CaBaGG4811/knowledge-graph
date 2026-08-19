@@ -159,10 +159,13 @@ const ModalManager = (function () {
         actionsEl.querySelectorAll('.modal-action-btn').forEach(function (b) { b.disabled = true; });
 
         try {
+            var s = Store.get('settings');
             var result = await API.post('/api/generate/action', {
                 action: action,
                 label: currentNode.label,
-                description: currentNode.description
+                description: currentNode.description,
+                llmUrl: s.llmUrl || '',
+                llmModel: s.llmModel || ''
             }) || {};
 
             var html = '';

@@ -269,7 +269,9 @@ const HomePage = (function () {
         try {
             // Шаг 1: проверка темы
             setStepState(0, 'active');
-            var check = await API.post('/api/generate/check', { topic: topic }, { timeout: 30000 });
+            var s = Store.get('settings');
+            var llmPayload = { topic: topic, llmUrl: s.llmUrl || '', llmModel: s.llmModel || '' };
+            var check = await API.post('/api/generate/check', llmPayload, { timeout: 30000 });
             if (!check.valid) {
                 setStepState(0, 'error');
                 await delay(600);
@@ -284,7 +286,7 @@ const HomePage = (function () {
 
             // Шаг 2: генерация
             setStepState(1, 'active');
-            var graphData = await API.post('/api/generate', { topic: topic }, { timeout: 600000 });
+            var graphData = await API.post('/api/generate', llmPayload, { timeout: 600000 });
             setStepState(1, 'done');
             await delay(400);
 

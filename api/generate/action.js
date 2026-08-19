@@ -8,9 +8,9 @@ module.exports = async function handler(req, res) {
 
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const { action, label, description } = req.body || {};
-    const llmUrl = process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
-    const llmModel = process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
+    const { action, label, description, llmUrl: userLlmUrl, llmModel: userLlmModel } = req.body || {};
+    const llmUrl = userLlmUrl || process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
+    const llmModel = userLlmModel || process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
 
     const prompts = {
         detail: `Объясни подробно: «${label}». ${description || ''}. Развёрнуто, 5-8 предложений, с примерами.`,

@@ -19,8 +19,9 @@ module.exports = async function handler(req, res) {
     }
 
     const trimmedTopic = topic.trim();
-    const llmUrl = process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
-    const llmModel = process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
+    const { llmUrl: userLlmUrl, llmModel: userLlmModel } = req.body || {};
+    const llmUrl = userLlmUrl || process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
+    const llmModel = userLlmModel || process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
 
     console.log('[Search] Searching for:', trimmedTopic);
     var searchResults = await webSearch(trimmedTopic);
