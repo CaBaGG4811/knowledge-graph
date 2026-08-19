@@ -155,23 +155,54 @@ const ModalManager = (function () {
         var resultEl = document.getElementById('modal-ai-result');
         var actionsEl = document.getElementById('modal-actions');
 
+        if (!LLM.isConfigured()) {
+            Toast.show(t('llmNotConfigured') || 'Введите API-ключ и модель в настройках', 'error');
+            return;
+        }
+
         resultEl.innerHTML = '<div class="modal-ai-loading"><div class="modal-spinner"></div> ' + t('aiLoading') + '</div>';
         actionsEl.querySelectorAll('.modal-action-btn').forEach(function (b) { b.disabled = true; });
 
         try {
-            var s = Store.get('settings');
-            var result = await API.post('/api/generate/action', {
-                action: action,
-                label: currentNode.label,
-                description: currentNode.description,
-                llmModel: s.llmModel || '',
-                llmApiKey: s.llmApiKey || ''
-            }) || {};
+            var prompts = {
+                detail: 'Объясни подробно: «' + currentNode.label + '». ' + (currentNode.description || '') + '. Развёрнуто, 5-8 предложений, с примерами.',
+                simple: 'Объясни просто: «' + currentNode.label + '». Без терминов, простыми словами. 4-6 предложений.',
+                child: 'Объясни ребёнку 10 лет: «' + currentNode.label + '». Простые слова, аналогии из жизни. 4-5 предложений.',
+                example: '2-3 примера: «' + currentNode.label + '». Конкретные, наглядные. 2-3 предложения на каждый.',
+                quiz: '3 вопроса по теме «' + currentNode.label + '» с 4 ответами. ТОЛЬКО JSON:\n[{"q":"Вопрос?","options":["A","B","C","D"],"correct":0}]',
+                mistakes: '3-5 ошибок при изучении «' + currentNode.label + '». Что ошибаются и как избежать. 2 предложения на каждую.',
+                summary: 'Конспект «' + currentNode.label + '». Тезисы, определения, ключевые факты.'
+            };
+
+            var raw = await LLM.call([
+                { role: 'system', content: 'Пиши кратко и по делу. Без воды, без roleplay, без «как преподавателя».' },
+                { role: 'user', content: prompts[action] }
+            ], { temperature: 0.4, max_tokens: 4096 });
+
+            var data = raw;
+
+            if (action === 'quiz') {
+                try {
+                    var cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+                    var match = cleaned.match(/\[[\s\S]*\]/);
+                    if (match) {
+                        var quizData = JSON.parse(match[0]);
+                        if (Array.isArray(quizData) && quizData.length > 0) {
+                            data = quizData.map(function (q) {
+                                var correctIdx = parseInt(q.correct, 10) || 1;
+                                if (correctIdx > 0 && correctIdx <= (q.options || []).length) correctIdx--;
+                                else correctIdx = 0;
+                                return { q: q.q || q.question || '', options: q.options || q.answers || [], correct: correctIdx };
+                            });
+                        }
+                    }
+                } catch (e) {}
+            }
 
             var html = '';
-            if (action === 'quiz' && Array.isArray(result.data)) {
+            if (action === 'quiz' && Array.isArray(data)) {
                 html = '<div class="quiz-box">';
-                result.data.forEach(function (q, i) {
+                data.forEach(function (q, i) {
                     if (!q.q || !q.options) return;
                     html += '<div class="quiz-q">';
                     html += '<div class="quiz-q-num">' + (i + 1) + '</div>';
@@ -185,7 +216,8 @@ const ModalManager = (function () {
                 });
                 html += '</div>';
             } else {
-                html = '<div class="modal-ai-text">' + formatText(result.data) + '</div>';
+                var text = typeof data === 'string' ? data : '';
+                html = '<div class="modal-ai-text">' + formatText(text) + '</div>';
             }
 
             resultEl.innerHTML = html + '<div class="modal-ai-actions"><button class="modal-action-btn modal-save-btn" id="modal-save-text">' + (t('saveText') || 'Сохранить') + '</button><button class="modal-action-btn" id="modal-ai-close-btn">' + t('closeBtn') + '</button></div>';
@@ -194,7 +226,7 @@ const ModalManager = (function () {
             var saveBtn = document.getElementById('modal-save-text');
             if (saveBtn) saveBtn.addEventListener('click', function () { saveText(resultEl); });
 
-            if (action === 'quiz' && Array.isArray(result.data)) {
+            if (action === 'quiz' && Array.isArray(data)) {
                 resultEl.querySelectorAll('.quiz-q').forEach(function (qEl) {
                     qEl.querySelectorAll('.quiz-opt').forEach(function (optBtn) {
                         optBtn.addEventListener('click', function () {

@@ -3,7 +3,7 @@ const Store = (function () {
     'use strict';
 
     var state = {
-        settings: { theme: 'dark', accentColor: '#e0e0e0', fontSize: 'medium', lang: 'ru', llmModel: '', llmApiKey: '' }
+        settings: { theme: 'dark', accentColor: '#e0e0e0', fontSize: 'medium', lang: 'ru', llmUrl: '', llmModel: '', llmApiKey: '' }
     };
 
     function get(key) { return key ? Object.assign({}, state[key]) : Object.assign({}, state); }

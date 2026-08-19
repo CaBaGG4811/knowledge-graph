@@ -256,6 +256,11 @@ const HomePage = (function () {
         var topic = input.value.trim();
         if (!topic) { Toast.show(t('inputEmpty'), 'error'); return; }
 
+        if (!LLM.isConfigured()) {
+            Toast.show(t('llmNotConfigured') || 'Введите API-ключ и модель в настройках', 'error');
+            return;
+        }
+
         var btn = document.getElementById('home-generate-btn');
         btn.disabled = true;
         clearInterval(hintTimer);
@@ -267,30 +272,83 @@ const HomePage = (function () {
         showLoading();
 
         try {
-            // Шаг 1: проверка темы
+            // Шаг 1: web-search на сервере
             setStepState(0, 'active');
-            var s = Store.get('settings');
-            var llmPayload = { topic: topic, llmModel: s.llmModel || '', llmApiKey: s.llmApiKey || '' };
-            var check = await API.post('/api/generate/check', llmPayload, { timeout: 30000 });
-            if (!check.valid) {
-                setStepState(0, 'error');
-                await delay(600);
-                hideLoading();
-                Toast.show(t('topicInvalid') + ': ' + (check.reason || t('topicInvalidDefault')), 'error');
-                subtitle.textContent = t('homeSubtitle');
-                startHints();
-                btn.disabled = false;
-                return;
-            }
+            var searchData = await API.post('/api/search', { topic: topic }, { timeout: 30000 });
             setStepState(0, 'done');
 
-            // Шаг 2: генерация
+            // Шаг 2: генерация через LLM из браузера
             setStepState(1, 'active');
-            var graphData = await API.post('/api/generate', llmPayload, { timeout: 600000 });
+
+            var searchContext = '';
+            if (searchData && searchData.results && searchData.results.length > 0) {
+                searchContext = '\n\nАктуальная информация из интернета:\n' + searchData.results.map(function (r, i) { return (i + 1) + '. ' + r; }).join('\n');
+            }
+
+            var userPrompt = 'Дерево знаний по теме «' + topic + '», 12-15 узлов.\n' +
+                'Используй факты из предоставленной информации. Если информации нет — используй свои знания.\n' +
+                searchContext + '\n\n' +
+                'Каждый узел:\n' +
+                '{\n' +
+                '  "id": "id",\n' +
+                '  "label": "Название",\n' +
+                '  "description": "Что это. 3-5 предложений, простым ясным языком, без воды.",\n' +
+                '  "why": "Зачем учить. Конкретная польза. 1-2 предложения.",\n' +
+                '  "difficulty": 1-5,\n' +
+                '  "time": "время изучения",\n' +
+                '  "level": 1-3,\n' +
+                '  "leadsTo": ["id"]\n' +
+                '}\n\n' +
+                'Только JSON:\n' +
+                '{"nodes":[...],"edges":[{"source":"id","target":"id"}]}\n\n' +
+                '- id — латиница без пробелов\n' +
+                '- level: 1=базовый, 2=средний, 3=продвинутый\n' +
+                '- difficulty: 1=легко, 3=средне, 5=сложно\n' +
+                '- leadsTo — куда ведёт тема\n' +
+                '- 12-15 узлов минимум';
+
+            var raw = await LLM.call([
+                { role: 'system', content: 'Ты помогаешь строить карту знаний. Отвечай ТОЛЬКО валидным JSON без markdown, без пояснений, без кодбеков.' },
+                { role: 'user', content: userPrompt }
+            ], { temperature: 0.3, max_tokens: 8192 });
+
+            var cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+            var graphData;
+            try {
+                graphData = JSON.parse(cleaned);
+            } catch (e) {
+                graphData = tryRepairJson(cleaned);
+                if (!graphData) throw new Error(t('jsonError'));
+            }
+
+            if (!graphData.nodes || !Array.isArray(graphData.nodes) || !graphData.edges || !Array.isArray(graphData.edges)) {
+                throw new Error(t('noNodesEdges'));
+            }
+
+            graphData.nodes = graphData.nodes.map(function (n) {
+                return {
+                    id: String(n.id),
+                    label: n.label || 'Без названия',
+                    description: (n.description || '').replace(/\*\*/g, '').replace(/\*/g, '').trim(),
+                    why: (n.why || '').replace(/\*\*/g, '').replace(/\*/g, '').trim(),
+                    difficulty: Math.min(5, Math.max(1, parseInt(n.difficulty, 10) || 3)),
+                    time: n.time || '',
+                    level: Math.min(3, Math.max(1, parseInt(n.level, 10) || 1)),
+                    leadsTo: Array.isArray(n.leadsTo) ? n.leadsTo.map(String) : []
+                };
+            });
+
+            graphData.edges = graphData.edges
+                .filter(function (e) { return e.source && e.target; })
+                .map(function (e) { return { source: String(e.source), target: String(e.target) }; });
+
+            var nodeIds = new Set(graphData.nodes.map(function (n) { return n.id; }));
+            graphData.edges = graphData.edges.filter(function (e) { return nodeIds.has(e.source) && nodeIds.has(e.target); });
+
             setStepState(1, 'done');
             await delay(400);
 
-            if (!graphData.nodes || graphData.nodes.length < 2) {
+            if (graphData.nodes.length < 2) {
                 throw new Error(t('tooFewData'));
             }
             hideLoading();
@@ -303,6 +361,34 @@ const HomePage = (function () {
         } finally {
             btn.disabled = false;
         }
+    }
+
+    function tryRepairJson(text) {
+        try {
+            var nodesMatch = text.match(/"nodes"\s*:\s*\[([\s\S]*)/);
+            if (!nodesMatch) return null;
+            var chunk = '[' + nodesMatch[1];
+            var openBraces = (chunk.match(/{/g) || []).length;
+            var closeBraces = (chunk.match(/}/g) || []).length;
+            chunk += '}'.repeat(Math.max(0, openBraces - closeBraces));
+            chunk += ']';
+            var nodes = [];
+            var re = /\{[^{}]*"id"\s*:\s*"([^"]+)"[^{}]*"label"\s*:\s*"([^"]*)"[^{}]*\}/g;
+            var m;
+            while ((m = re.exec(chunk)) !== null) {
+                try { nodes.push(JSON.parse(m[0])); } catch (_) {}
+            }
+            if (nodes.length === 0) return null;
+            var edges = [];
+            nodes.forEach(function (n) {
+                (n.leadsTo || []).forEach(function (target) {
+                    if (nodes.find(function (x) { return x.id === target; })) {
+                        edges.push({ source: n.id, target: target });
+                    }
+                });
+            });
+            return { nodes: nodes, edges: edges };
+        } catch (_) { return null; }
     }
 
     /* ============================================

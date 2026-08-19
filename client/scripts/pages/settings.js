@@ -7,6 +7,8 @@ const SettingsPage = (function () {
         var t = I18n.t;
         var s = Store.get('settings');
         var langList = I18n.getLangList();
+        var detectedUrl = LLM.detectUrl(s.llmApiKey || '');
+        var currentUrl = s.llmUrl || detectedUrl || '';
         var content = document.getElementById('app-content');
         content.innerHTML = `
             <div class="settings-page">
@@ -23,11 +25,16 @@ const SettingsPage = (function () {
                         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
                             <span class="settings-label">${t('settingLlmApiKey') || 'API-ключ'}</span>
                             <input type="password" class="settings-input" id="settings-llm-apikey" placeholder="sk-..." value="${s.llmApiKey || ''}">
-                            <span style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${t('apiKeyHint') || 'Получите ключ в LM Studio или купите у OpenAI / Google / Anthropic'}</span>
+                            <span style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${t('apiKeyHint') || 'LM Studio, OpenAI, Anthropic, Gemini и др.'}</span>
                         </div>
                         <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
                             <span class="settings-label">${t('settingLlmModel') || 'Модель'}</span>
                             <input type="text" class="settings-input" id="settings-llm-model" placeholder="${t('modelPlaceholder') || 'gpt-4o-mini, gemini-2.0-flash, ...'}" value="${s.llmModel || ''}">
+                        </div>
+                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:10px; padding: 14px 0;">
+                            <span class="settings-label">${t('settingLlmUrl') || 'URL сервера'}</span>
+                            <input type="text" class="settings-input" id="settings-llm-url" placeholder="${t('urlPlaceholder') || 'Авто-определение по ключу или localhost:1234'}" value="${currentUrl}">
+                            <span style="font-size:11px; color:var(--text-secondary); margin-top:2px;">${detectedUrl ? '✅ ' + t('urlDetected') + ': ' + detectedUrl : t('urlHint') || 'Оставьте пустым для авто-определения'}</span>
                         </div>
                     </div>
                 </div>
@@ -102,17 +109,31 @@ const SettingsPage = (function () {
 
         var apiKeyInput = document.getElementById('settings-llm-apikey');
         var modelInput = document.getElementById('settings-llm-model');
+        var urlInput = document.getElementById('settings-llm-url');
 
         if (apiKeyInput) {
             apiKeyInput.addEventListener('input', function () {
                 clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(function () { saveSetting('llmApiKey', apiKeyInput.value); }, 500);
+                debounceTimer = setTimeout(function () {
+                    saveSetting('llmApiKey', apiKeyInput.value);
+                    var detected = LLM.detectUrl(apiKeyInput.value);
+                    if (detected && urlInput) {
+                        urlInput.value = detected;
+                        saveSetting('llmUrl', detected);
+                    }
+                }, 500);
             });
         }
         if (modelInput) {
             modelInput.addEventListener('input', function () {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(function () { saveSetting('llmModel', modelInput.value); }, 500);
+            });
+        }
+        if (urlInput) {
+            urlInput.addEventListener('input', function () {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function () { saveSetting('llmUrl', urlInput.value); }, 500);
             });
         }
     }

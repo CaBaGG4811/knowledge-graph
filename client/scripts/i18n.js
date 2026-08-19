@@ -106,6 +106,9 @@ const I18n = (function () {
             settingLlmApiKey: 'API-ключ',
             apiKeyHint: 'Получите ключ в LM Studio или купите у OpenAI / Google / Anthropic',
             modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
+            urlPlaceholder: 'Авто-определение по ключу или localhost:1234',
+            urlDetected: 'Авто-определён',
+            urlHint: 'Оставьте пустым для авто-определения',
 
             // Errors
             llmError: 'LM Studio недоступен',
@@ -115,6 +118,7 @@ const I18n = (function () {
             treeDataRequired: 'Название и данные обязательны',
             unknownAction: 'Неизвестное действие',
             llmUnavailable: 'LLM недоступен',
+            llmNotConfigured: 'Введите API-ключ и модель в настройках',
         },
 
         en: {
@@ -212,6 +216,9 @@ const I18n = (function () {
             settingLlmApiKey: 'API Key',
             apiKeyHint: 'Get a key from LM Studio or buy from OpenAI / Google / Anthropic',
             modelPlaceholder: 'gpt-4o-mini, gemini-2.0-flash, ...',
+            urlPlaceholder: 'Auto-detect from key or localhost:1234',
+            urlDetected: 'Auto-detected',
+            urlHint: 'Leave empty for auto-detection',
 
             llmError: 'LM Studio unavailable',
             jsonError: 'Model returned invalid JSON.',
@@ -220,6 +227,7 @@ const I18n = (function () {
             treeDataRequired: 'Name and data are required',
             unknownAction: 'Unknown action',
             llmUnavailable: 'LLM unavailable',
+            llmNotConfigured: 'Enter API key and model in settings',
         },
 
         zh: {
@@ -325,6 +333,7 @@ const I18n = (function () {
             treeDataRequired: '名称和数据是必需的',
             unknownAction: '未知操作',
             llmUnavailable: 'LLM 不可用',
+            llmNotConfigured: '请在设置中输入 API 密钥和模型',
         },
 
         es: {
@@ -430,6 +439,7 @@ const I18n = (function () {
             treeDataRequired: 'Nombre y datos son obligatorios',
             unknownAction: 'Acción desconocida',
             llmUnavailable: 'LLM no disponible',
+            llmNotConfigured: 'Ingresa la clave API y el modelo en configuración',
         },
 
         hi: {
@@ -535,6 +545,7 @@ const I18n = (function () {
             treeDataRequired: 'नाम और डेटा आवश्यक हैं',
             unknownAction: 'अज्ञात क्रिया',
             llmUnavailable: 'LLM उपलब्ध नहीं',
+            llmNotConfigured: 'सेटिंग्स में API कुंजी और मॉडल दर्ज करें',
         },
 
         ar: {
@@ -640,6 +651,7 @@ const I18n = (function () {
             treeDataRequired: 'الاسم والبيانات مطلوبان',
             unknownAction: 'إجراء غير معروف',
             llmUnavailable: 'LLM غير متاح',
+            llmNotConfigured: 'أدخل مفتاح API والنموذج في الإعدادات',
         }
     };
 
