@@ -164,7 +164,6 @@ const ModalManager = (function () {
                 action: action,
                 label: currentNode.label,
                 description: currentNode.description,
-                llmUrl: s.llmUrl || '',
                 llmModel: s.llmModel || '',
                 llmApiKey: s.llmApiKey || ''
             }) || {};

@@ -270,7 +270,7 @@ const HomePage = (function () {
             // Шаг 1: проверка темы
             setStepState(0, 'active');
             var s = Store.get('settings');
-            var llmPayload = { topic: topic, llmUrl: s.llmUrl || '', llmModel: s.llmModel || '', llmApiKey: s.llmApiKey || '' };
+            var llmPayload = { topic: topic, llmModel: s.llmModel || '', llmApiKey: s.llmApiKey || '' };
             var check = await API.post('/api/generate/check', llmPayload, { timeout: 30000 });
             if (!check.valid) {
                 setStepState(0, 'error');
