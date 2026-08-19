@@ -1,0 +1,14 @@
+{
+  "name": "knowledge-graph",
+  "version": "3.0.0",
+  "description": "Интерактивная карта знаний с генерацией через LLM",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "dev": "cd server && npm start",
+    "vercel-build": "echo 'Build complete'"
+  },
+  "dependencies": {}
+}
