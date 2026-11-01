@@ -17,22 +17,22 @@ router.put('/', (req, res) => {
     var { theme, accentColor, fontSize, lang, llmUrl, llmModel } = req.body;
 
     if (theme !== undefined) {
-        runQuery('UPDATE settings SET value = ? WHERE key = ?', [theme, 'theme']);
+        runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['theme', theme]);
     }
     if (accentColor !== undefined) {
-        runQuery('UPDATE settings SET value = ? WHERE key = ?', [accentColor, 'accent_color']);
+        runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['accent_color', accentColor]);
     }
     if (fontSize !== undefined) {
-        runQuery('UPDATE settings SET value = ? WHERE key = ?', [fontSize, 'font_size']);
+        runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['font_size', fontSize]);
     }
     if (lang !== undefined) {
-        runQuery('UPDATE settings SET value = ? WHERE key = ?', [lang, 'lang']);
+        runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['lang', lang]);
     }
     if (llmUrl !== undefined) {
-        runQuery('UPDATE settings SET value = ? WHERE key = ?', [llmUrl, 'llm_url']);
+        runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['llm_url', llmUrl]);
     }
     if (llmModel !== undefined) {
-        runQuery('UPDATE settings SET value = ? WHERE key = ?', [llmModel, 'llm_model']);
+        runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['llm_model', llmModel]);
     }
 
     var themeVal = (getOne('SELECT value FROM settings WHERE key = ?', ['theme']) || {}).value || 'dark';

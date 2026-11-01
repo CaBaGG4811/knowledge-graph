@@ -42,7 +42,9 @@ function ensureInit() {
                 theme: 'dark',
                 accent_color: '#4a7ab5',
                 font_size: 'medium',
-                lang: 'ru'
+                lang: 'ru',
+                llm_url: '',
+                llm_model: ''
             };
             Object.keys(defaults).forEach(function (k) {
                 var exists = getOne('SELECT id FROM settings WHERE key = ?', [k]);

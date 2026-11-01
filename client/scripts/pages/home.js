@@ -67,10 +67,6 @@ const HomePage = (function () {
                 <div class="loading-panel">
                     <div id="home-loading-tip" class="loading-tip"></div>
                     <div id="home-loading-checklist" class="loading-checklist"></div>
-                    <div class="loading-progress-bar-container">
-                        <div id="home-loading-bar" class="loading-progress-bar"></div>
-                    </div>
-                    <div id="home-loading-percent" class="loading-percent">0%</div>
                 </div>
             </div>
         `;
@@ -180,9 +176,13 @@ const HomePage = (function () {
             var availW = w - sidebarW - 40;
             if (availW < 200) return;
 
-            var count = 3 + Math.floor(Math.random() * 3);
-            var baseX = 40 + Math.random() * (availW - 300);
-            var baseY = 80 + Math.random() * (h - 200);
+            var count = 3;
+            var topBand = Math.random() < 0.5;
+            var baseX = sidebarW + 40 + Math.random() * Math.max(20, availW - 480);
+            baseX = Math.max(sidebarW + 20, Math.min(baseX, w - 460));
+            var baseY = topBand
+                ? 30 + Math.random() * Math.max(40, h * 0.18)
+                : Math.min(h - 90, h * 0.82 + Math.random() * Math.max(20, h * 0.1));
             var topic = ghostTopics[Math.floor(Math.random() * ghostTopics.length)];
 
             var cards = [];
@@ -235,7 +235,7 @@ const HomePage = (function () {
                     cards.forEach(function (c, i) {
                         var delay = i * 120;
                         var cp = Math.max(0, Math.min(1, (p * totalDuration * 0.3 - delay) / 400));
-                        c.el.style.opacity = cp;
+                        c.el.style.opacity = 0.55 * cp;
                         c.el.style.transform = 'scale(' + (0.8 + 0.2 * cp) + ') translateY(' + (20 * (1 - cp)) + 'px)';
                     });
                 } else if (progress < 0.5) {
@@ -243,14 +243,14 @@ const HomePage = (function () {
                     lines.forEach(function (l, i) {
                         var delay = i * 150;
                         var cp = Math.max(0, Math.min(1, (lp * 2000 - delay) / 500));
-                        l.style.opacity = cp * 0.3;
+                        l.style.opacity = cp * 0.2;
                     });
                 } else if (progress < 0.85) {
                     cards.forEach(function (c) {
-                        c.el.style.opacity = '1';
+                        c.el.style.opacity = '0.55';
                         c.el.style.transform = 'scale(1) translateY(0)';
                     });
-                    lines.forEach(function (l) { l.style.opacity = '0.3'; });
+                    lines.forEach(function (l) { l.style.opacity = '0.2'; });
                 } else {
                     var fp = (progress - 0.85) / 0.15;
                     cards.forEach(function (c, i) {
@@ -260,7 +260,7 @@ const HomePage = (function () {
                         c.el.style.transform = 'scale(' + (1 - 0.15 * cp) + ') translateY(' + (-15 * cp) + 'px)';
                     });
                     lines.forEach(function (l) {
-                        l.style.opacity = 0.3 * (1 - fp);
+                        l.style.opacity = 0.2 * (1 - fp);
                     });
                 }
 
@@ -339,23 +339,49 @@ const HomePage = (function () {
         subtitle.style.opacity = '1';
 
         showLoading();
-        startLoadingAnimation();
 
-        try {
-            var graphData = await API.post('/api/generate', { topic: topic }, { timeout: 600000 });
-            finishLoadingAnimation();
-            await new Promise(function (r) { setTimeout(r, 400); });
-            if (!graphData.nodes || graphData.nodes.length < 2) {
-                throw new Error(t('tooFewData'));
-            }
+        async function abortWith(msg) {
             hideLoading();
-            showGraph(graphData, topic);
-        } catch (err) {
-            hideLoading();
-            Toast.show(err.message, 'error');
+            Toast.show(msg, 'error');
             subtitle.textContent = t('homeSubtitle');
             startHints();
             startGhostAnimation();
+        }
+
+        try {
+            setStage(0);
+            var ping;
+            try { ping = await API.get('/api/generate/ping'); }
+            catch (e) { ping = { ok: false }; }
+            if (!ping.ok) { stageFail(0); await wait(900); await abortWith(t('checkFailConn')); return; }
+            stageDone(0);
+
+            setStage(1);
+            var check;
+            try { check = await API.post('/api/generate/check', { topic: topic }, { timeout: 120000 }); }
+            catch (e) { check = { ok: false, code: 'connection' }; }
+            if (!check.ok) {
+                stageFail(1);
+                await wait(900);
+                var msg = check.code === 'profanity' ? t('checkFailProfanity') :
+                    check.code === 'irrelevant' ? t('checkFailIrrelevant') :
+                    check.code === 'empty' ? t('inputEmpty') : t('checkFailConn');
+                await abortWith(msg);
+                return;
+            }
+            stageDone(1);
+
+            setStage(2);
+            var graphData;
+            try { graphData = await API.post('/api/generate', { topic: topic }, { timeout: 600000 }); }
+            catch (e) { stageFail(2); await wait(900); await abortWith(e.message || t('llmUnavailable')); return; }
+            if (!graphData.nodes || graphData.nodes.length < 2) { stageFail(2); await wait(900); await abortWith(t('tooFewData')); return; }
+            stageDone(2);
+            await wait(450);
+            hideLoading();
+            showGraph(graphData, topic);
+        } catch (err) {
+            await abortWith(err.message || t('llmUnavailable'));
         } finally {
             btn.disabled = false;
         }
@@ -423,67 +449,41 @@ const HomePage = (function () {
         var t = I18n.t;
         var el = document.getElementById('home-loading');
         el.classList.remove('hidden');
-        var bar = document.getElementById('home-loading-bar');
-        bar.style.width = '0%';
-        bar.classList.remove('waiting');
-        document.getElementById('home-loading-percent').textContent = '0%';
 
         var cl = document.getElementById('home-loading-checklist');
         cl.innerHTML = '';
-        var steps = [t('step0'), t('step1'), t('step2'), t('step3'), t('step4'), t('step5'), t('step6')];
-        steps.forEach(function (text, i) {
-            cl.innerHTML += '<div class="loading-check-item" id="hl-step-' + i + '">' +
+        var stages = [t('stageConn'), t('stageCheck'), t('stageTree')];
+        stages.forEach(function (text, i) {
+            cl.innerHTML += '<div class="loading-check-item" id="hl-stage-' + i + '" style="animation-delay:' + (i * 0.12) + 's">' +
                 '<div class="loading-check-spinner"></div>' +
                 '<div class="loading-check-circle"><span class="loading-check-mark">\u2713</span></div>' +
                 '<span class="loading-check-text">' + text + '</span></div>';
         });
 
-        var tips = [t('tip0'), t('tip1'), t('tip2'), t('tip3'), t('tip4')];
+        var tips = [t('tip1'), t('tip2'), t('tip3'), t('tip4')];
         document.getElementById('home-loading-tip').textContent = tips[Math.floor(Math.random() * tips.length)];
     }
 
-    function startLoadingAnimation() {
-        var bar = document.getElementById('home-loading-bar');
-        bar.classList.add('waiting');
-        var currentStep = 0;
-        var steps = 7;
+    function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-        function advanceStep() {
-            var el = document.getElementById('hl-step-' + currentStep);
-            if (!el) return;
-            if (currentStep > 0) {
-                var prev = document.getElementById('hl-step-' + (currentStep - 1));
-                if (prev) { prev.classList.remove('active'); prev.classList.add('done'); }
-            }
-            el.classList.add('active');
-            bar.style.width = Math.round((currentStep / steps) * 100) + '%';
-            document.getElementById('home-loading-percent').textContent = Math.round((currentStep / steps) * 100) + '%';
-            currentStep++;
-            if (currentStep < steps) {
-                var delay = currentStep === 1 ? 800 + Math.random() * 400 : 400 + Math.random() * 600;
-                loadingAnimFrame = setTimeout(advanceStep, delay);
-            }
-        }
-        loadingAnimFrame = setTimeout(advanceStep, 100);
+    function setStage(i) {
+        var el = document.getElementById('hl-stage-' + i);
+        if (el) el.classList.add('active');
     }
 
-    function finishLoadingAnimation() {
-        if (loadingAnimFrame) { clearTimeout(loadingAnimFrame); loadingAnimFrame = null; }
-        var bar = document.getElementById('home-loading-bar');
-        if (bar) bar.classList.remove('waiting');
-        var steps = 6, i = 0;
-        function markDone() {
-            if (i >= steps) { if (bar) bar.style.width = '100%'; var p = document.getElementById('home-loading-percent'); if (p) p.textContent = '100%'; return; }
-            var el = document.getElementById('hl-step-' + i);
-            if (el) { el.classList.remove('active'); el.classList.add('done'); }
-            if (bar) bar.style.width = Math.round(((i + 1) / steps) * 100) + '%';
-            var p = document.getElementById('home-loading-percent'); if (p) p.textContent = Math.round(((i + 1) / steps) * 100) + '%';
-            i++;
-            setTimeout(markDone, 60);
-        }
-        markDone();
+    function stageDone(i) {
+        var el = document.getElementById('hl-stage-' + i);
+        if (el) { el.classList.remove('active'); el.classList.add('done'); }
     }
 
+    function stageFail(i) {
+        var el = document.getElementById('hl-stage-' + i);
+        if (!el) return;
+        el.classList.remove('active');
+        el.classList.add('failed');
+        var mark = el.querySelector('.loading-check-mark');
+        if (mark) mark.textContent = '\u2715';
+    }
     function hideLoading() {
         if (loadingAnimFrame) { clearTimeout(loadingAnimFrame); loadingAnimFrame = null; }
         var el = document.getElementById('home-loading');

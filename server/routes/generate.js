@@ -7,7 +7,6 @@ const router = express.Router();
 
 const DEFAULT_LLM_URL = process.env.LLM_URL || 'http://172.25.64.1:1234/v1/chat/completions';
 const DEFAULT_LLM_MODEL = process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
-const LLM_API_KEY = process.env.LLM_API_KEY || '';
 
 function getLlmConfig() {
     var url = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_url']) || {}).value || '';
@@ -187,14 +186,13 @@ function tryRepairJson(text) {
     } catch (_) { return null; }
 }
 
-function llmFetch(url, body, extraHeaders) {
+function llmFetch(url, body, extraHeaders, timeoutMs) {
     return new Promise((resolve, reject) => {
         const parsed = new URL(url);
         const isHttps = parsed.protocol === 'https:';
         const lib = isHttps ? https : http;
         const data = JSON.stringify(body);
         const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
-        if (LLM_API_KEY) headers['x-api-key'] = LLM_API_KEY;
         if (extraHeaders) Object.assign(headers, extraHeaders);
         const req = lib.request({
             hostname: parsed.hostname,
@@ -202,14 +200,14 @@ function llmFetch(url, body, extraHeaders) {
             path: parsed.pathname + (parsed.search || ''),
             method: 'POST',
             headers,
-            timeout: 600000,
+            timeout: timeoutMs || 600000,
             agent: isHttps ? https.globalAgent : http.globalAgent
         }, (res) => {
             let chunks = [];
             res.on('data', (c) => chunks.push(c));
             res.on('end', () => resolve({ status: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 300, json: () => Promise.resolve(JSON.parse(Buffer.concat(chunks).toString())), text: () => Promise.resolve(Buffer.concat(chunks).toString()) }));
         });
-        req.setTimeout(600000, () => { req.destroy(); reject(new Error('LLM timeout')); });
+        req.setTimeout(timeoutMs || 600000, () => { req.destroy(); reject(new Error('LLM timeout')); });
         req.on('error', reject);
         req.write(data);
         req.end();
@@ -420,6 +418,64 @@ router.post('/action', async (req, res) => {
     } catch (err) {
         console.error('[AI]', err.message);
         res.status(502).json({ error: err.message });
+    }
+});
+
+
+// ============================================
+//   LLM ping + topic relevance check
+// ============================================
+router.get('/ping', async function (req, res) {
+    try {
+        var cfg = getLlmConfig();
+        var modelsUrl;
+        try { modelsUrl = new URL(cfg.url).origin + '/v1/models'; }
+        catch (e) { return res.json({ ok: false, error: 'bad llm url' }); }
+        await fetchUrl(modelsUrl, 6000);
+        res.json({ ok: true, model: cfg.model, url: cfg.url });
+    } catch (e) {
+        res.json({ ok: false, error: e.message });
+    }
+});
+
+var CHECK_STEMS = ["хуй","хуя","хуё","хуе","хуи","пизд","бля","бляд","залуп","шлюх","пидор","пидар","мудак","мудил","гандон","мразь","дроч","сучар","нахуй","похуй","fuck","bitch"];
+
+var CHECK_SYSTEM = "Ты — модератор образовательного сервиса «Карта знаний». Проверь запрос пользователя и ответь ТОЛЬКО валидным JSON без markdown и без пояснений. Формат ответа: {\"valid\": true} — если запрос является осмысленной темой для изучения и не содержит матов, ругательств и оскорблений; или {\"valid\": false, \"reason\": \"краткая причина на русском\"} — если запрос содержит маты, ругательства, оскорбления, является бессмыслицей, бредом, спамом или рекламой.";
+var CHECK_USER_PREFIX = "Запрос пользователя: «";
+var CHECK_USER_SUFFIX = "». Ответь JSON-ом: это осмысленная учебная тема без матов и бреда?";
+
+router.post('/check', async function (req, res) {
+    var topic = (req.body && typeof req.body.topic === 'string') ? req.body.topic.trim() : '';
+    if (!topic) return res.json({ ok: false, code: 'empty' });
+    if (topic.length > 200) return res.json({ ok: false, code: 'irrelevant' });
+    var low = topic.toLowerCase();
+    for (var i = 0; i < CHECK_STEMS.length; i++) {
+        if (low.indexOf(CHECK_STEMS[i]) !== -1) return res.json({ ok: false, code: 'profanity' });
+    }
+    try {
+        var cfg = getLlmConfig();
+        var resp = await llmFetch(cfg.url, {
+            model: cfg.model,
+            messages: [
+                { role: 'system', content: CHECK_SYSTEM },
+                { role: 'user', content: CHECK_USER_PREFIX + topic + CHECK_USER_SUFFIX }
+            ],
+            temperature: 0.0,
+            max_tokens: 1500
+        }, null, 60000);
+        if (!resp.ok) return res.json({ ok: false, code: 'connection' });
+        var data = await resp.json();
+        var msg0 = (data.choices && data.choices[0] && data.choices[0].message) || {};
+        var raw = ((msg0.content || msg0.reasoning_content) || '').toString();
+        var verdict = null;
+        var m = raw.match(/\{[^{}]*"valid"[^{}]*\}/);
+        if (m) { try { verdict = JSON.parse(m[0]); } catch (e) { verdict = null; } }
+        if (verdict && verdict.valid === false) return res.json({ ok: false, code: 'irrelevant', reason: verdict.reason || '' });
+        if (verdict && verdict.valid === true) return res.json({ ok: true, code: 'ok' });
+        if (raw.indexOf('valid') !== -1 && raw.indexOf('false') !== -1) return res.json({ ok: false, code: 'irrelevant' });
+        res.json({ ok: true, code: 'ok' });
+    } catch (e) {
+        res.json({ ok: false, code: 'connection', error: e.message });
     }
 });
 

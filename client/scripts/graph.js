@@ -3,34 +3,50 @@ const GraphRenderer = (function () {
     'use strict';
 
     var CARD_SIZES = {
-        0: { width: 240, height: 80 },
-        1: { width: 200, height: 68 },
-        2: { width: 180, height: 60 },
-        3: { width: 160, height: 52 },
-        4: { width: 140, height: 48 }
+        0: { width: 300, height: 124 },
+        1: { width: 260, height: 112 },
+        2: { width: 240, height: 104 },
+        3: { width: 224, height: 100 },
+        4: { width: 210, height: 96 }
     };
 
-    var CARD_STYLES = {
-        0: { fill: '#1a1a1a', stroke: '#444444', strokeWidth: 1.5, titleColor: '#e0e0e0', descColor: '#888888' },
-        1: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' },
-        2: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' },
-        3: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' },
-        4: { fill: '#111111', stroke: '#333333', strokeWidth: 1, titleColor: '#e0e0e0', descColor: '#888888' }
-    };
-
-    var CARD_STYLES_LIGHT = {
-        0: { fill: 'url(#card-gradient-root)', stroke: '#ccc', strokeWidth: 1, titleColor: '#111', descColor: '#666' },
-        1: { fill: 'url(#card-gradient-l1)', stroke: '#ddd', strokeWidth: 1, titleColor: '#222', descColor: '#777' },
-        2: { fill: 'url(#card-gradient-l2)', stroke: '#ddd', strokeWidth: 1, titleColor: '#333', descColor: '#777' },
-        3: { fill: 'url(#card-gradient-l3)', stroke: '#e0e0e0', strokeWidth: 1, titleColor: '#444', descColor: '#888' },
-        4: { fill: 'url(#card-gradient-l4)', stroke: '#e0e0e0', strokeWidth: 1, titleColor: '#555', descColor: '#888' }
-    };
+    function difficultyColor(diff) {
+        if (diff <= 2) return '#22c55e';
+        if (diff === 3) return '#eab308';
+        if (diff === 4) return '#f97316';
+        return '#ef4444';
+    }
 
     var currentEdgesProcessed = [];
 
     function truncateText(text, maxLen) {
         if (!text) return '';
         return text.length <= maxLen ? text : text.substring(0, maxLen - 1) + '\u2026';
+    }
+
+    // заголовок максимум на 2 строки, с многоточием если не влезло
+    function wrapTitle(text, maxLen) {
+        if (!text) return [''];
+        var words = String(text).split(/\s+/).filter(function (w) { return w.length > 0; });
+        var lines = ['', ''];
+        var li = 0;
+        var i = 0;
+        for (i = 0; i < words.length && li < 2; i++) {
+            var w = words[i];
+            if (lines[li].length === 0) {
+                lines[li] = w;
+            } else if ((lines[li] + ' ' + w).length <= maxLen) {
+                lines[li] += ' ' + w;
+            } else {
+                li++;
+                i--;
+            }
+        }
+        var overflow = i < words.length;
+        var result = lines[1].length > 0 ? lines : [lines[0]];
+        if (overflow && result.length === 2) result[1] = truncateText(result[1], maxLen - 1);
+        result = result.map(function (l) { return truncateText(l, maxLen); });
+        return result;
     }
 
     function shortDescription(text) {
@@ -40,12 +56,11 @@ const GraphRenderer = (function () {
         return (sentences[0] + sentences[1]).trim();
     }
 
-    function computeCardWidth(depth, titleLen, descLen) {
+    function computeCardWidth(depth, titleLen) {
         var base = CARD_SIZES[depth] || CARD_SIZES[4];
         var w = base.width;
-        if (titleLen > 16) w += (titleLen - 16) * 2;
-        if (descLen > 35) w += (descLen - 35) * 1;
-        return Math.min(290, Math.max(w, base.width));
+        if (titleLen > 22) w += Math.min(60, Math.round((titleLen - 22) * 2.5));
+        return w;
     }
 
     function findRootNodeId(nodes, edges) {
@@ -140,6 +155,41 @@ const GraphRenderer = (function () {
         }, 3000);
     }
 
+    // Раскладка без наложений: раздвигаем карточки в каждом ряду,
+    // затем центрируем родителей над детьми (снизу вверх), повторяем
+    function layoutWithoutOverlaps(nodesFlat, childrenMap) {
+        var byDepth = {};
+        nodesFlat.forEach(function (n) { (byDepth[n.depth] = byDepth[n.depth] || []).push(n); });
+        var maxDepth = 0;
+        nodesFlat.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
+
+        function relax() {
+            Object.keys(byDepth).map(Number).forEach(function (dep) {
+                var row = byDepth[dep].sort(function (a, b) { return a.tx - b.tx; });
+                for (var i = 1; i < row.length; i++) {
+                    var need = (row[i - 1].cardWidth + row[i].cardWidth) / 2 + 70;
+                    if (row[i].tx - row[i - 1].tx < need) row[i].tx = row[i - 1].tx + need;
+                }
+            });
+        }
+        function recenter() {
+            for (var dep = maxDepth; dep >= 1; dep--) {
+                byDepth[dep - 1].forEach(function (p) {
+                    var kids = childrenMap[p.id] || [];
+                    if (!kids.length) return;
+                    var sum = 0, cnt = 0;
+                    kids.forEach(function (id) {
+                        for (var j = 0; j < nodesFlat.length; j++) {
+                            if (nodesFlat[j].id === id) { sum += nodesFlat[j].tx; cnt++; break; }
+                        }
+                    });
+                    if (cnt) p.tx = sum / cnt;
+                });
+            }
+        }
+        relax(); recenter(); relax(); recenter(); relax();
+    }
+
     function renderGraph(graphData, topicName) {
         var container = document.getElementById('graph-container');
         if (!container) return;
@@ -152,7 +202,6 @@ const GraphRenderer = (function () {
         var svg = d3.select('#graph-container').append('svg').attr('width', width).attr('height', height);
 
         var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-        var styles = isDark ? CARD_STYLES : CARD_STYLES_LIGHT;
 
         var defs = svg.append('defs');
 
@@ -161,34 +210,29 @@ const GraphRenderer = (function () {
         bgGrad.append('stop').attr('offset', '100%').attr('stop-color', isDark ? '#000000' : '#e0e0e0');
         svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#vignette-bg)');
 
+        // мягкая тень под карточками
+        var cardShadow = defs.append('filter').attr('id', 'card-shadow').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+        cardShadow.append('feDropShadow').attr('dx', 0).attr('dy', 3).attr('stdDeviation', 4)
+            .attr('flood-color', '#000000').attr('flood-opacity', isDark ? 0.55 : 0.18);
+
         function addGrad(id, c1, c2) {
             var g = defs.append('linearGradient').attr('id', id).attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
             g.append('stop').attr('offset', '0%').attr('stop-color', c1);
             g.append('stop').attr('offset', '100%').attr('stop-color', c2);
         }
         if (isDark) {
-            addGrad('card-gradient-root', '#111111', '#0a0a0a');
-            addGrad('card-gradient-l1', '#0d0d0d', '#111111');
-            addGrad('card-gradient-l2', '#0c0c0c', '#101010');
-            addGrad('card-gradient-l3', '#0b0b0b', '#0f0f0f');
-            addGrad('card-gradient-l4', '#0a0a0a', '#0e0e0e');
+            addGrad('card-gradient-root', '#1c1c1c', '#101010');
+            addGrad('card-gradient-l1', '#141414', '#0e0e0e');
+            addGrad('card-gradient-l2', '#131313', '#0d0d0d');
+            addGrad('card-gradient-l3', '#121212', '#0c0c0c');
+            addGrad('card-gradient-l4', '#111111', '#0b0b0b');
         } else {
-            addGrad('card-gradient-root', '#ffffff', '#f5f5f5');
+            addGrad('card-gradient-root', '#ffffff', '#f2f2f2');
             addGrad('card-gradient-l1', '#ffffff', '#f0f0f0');
             addGrad('card-gradient-l2', '#ffffff', '#eeeeee');
             addGrad('card-gradient-l3', '#f8f8f8', '#eeeeee');
             addGrad('card-gradient-l4', '#f5f5f5', '#eeeeee');
         }
-
-        var linkGrad = defs.append('linearGradient').attr('id', 'link-gradient').attr('gradientUnits', 'userSpaceOnUse');
-        linkGrad.append('stop').attr('offset', '0%').attr('stop-color', '#444444');
-        linkGrad.append('stop').attr('offset', '100%').attr('stop-color', '#333333');
-
-        var glowFilter = defs.append('filter').attr('id', 'link-glow').attr('x', '-20%').attr('y', '-20%').attr('width', '140%').attr('height', '140%');
-        glowFilter.append('feGaussianBlur').attr('in', 'SourceGraphic').attr('stdDeviation', '0').attr('result', 'blur');
-        var feMerge = glowFilter.append('feMerge');
-        feMerge.append('feMergeNode').attr('in', 'blur');
-        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
 
         var graphGroup = svg.append('g').attr('class', 'graph-root');
         var zoomBehavior = d3.zoom().scaleExtent([0.15, 4]).on('zoom', function (e) { graphGroup.attr('transform', e.transform); });
@@ -199,13 +243,19 @@ const GraphRenderer = (function () {
         var hierarchyRoot = buildHierarchy(graphData.nodes, graphData.edges, rootId);
         var d3Hierarchy = d3.hierarchy(hierarchyRoot);
 
-        d3.tree().nodeSize([480, 200])(d3Hierarchy);
+        d3.tree().nodeSize([560, 250])(d3Hierarchy);
+
+        var childrenMap = {};
+        d3Hierarchy.links().forEach(function (l) {
+            var pid = l.source.data.id;
+            (childrenMap[pid] = childrenMap[pid] || []).push(l.target.data.id);
+        });
 
         // плоский массив
         var nodesFlat = [];
         d3Hierarchy.descendants().forEach(function (d) {
             var orig = d.data;
-            var cw = computeCardWidth(d.depth, (orig.label || '').length, (orig.description || '').length);
+            var cw = computeCardWidth(d.depth, (orig.label || '').length);
             var ch = (CARD_SIZES[d.depth] || CARD_SIZES[4]).height;
             nodesFlat.push({
                 id: orig.id, label: orig.label, description: orig.description,
@@ -217,6 +267,9 @@ const GraphRenderer = (function () {
             });
         });
 
+        // убираем наложения карточек
+        layoutWithoutOverlaps(nodesFlat, childrenMap);
+
         // центрируем
         var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         nodesFlat.forEach(function (n) {
@@ -226,7 +279,7 @@ const GraphRenderer = (function () {
             if (n.ty > maxY) maxY = n.ty;
         });
         var offX = width / 2 - (minX + maxX) / 2;
-        var offY = height * 0.8 - maxY;
+        var offY = height * 0.82 - maxY;
         nodesFlat.forEach(function (n) { n.tx += offX; n.ty += offY; });
 
         var nodeById = {};
@@ -240,7 +293,7 @@ const GraphRenderer = (function () {
         });
         currentEdgesProcessed = edgesProcessed;
 
-        // кривые
+        // связи
         var linkGroup = graphGroup.append('g').attr('class', 'links-layer');
         function curvePath(src, tgt) {
             var sx = src.tx, sy = src.ty - src.cardHeight / 2;
@@ -251,14 +304,11 @@ const GraphRenderer = (function () {
         }
 
         var rootNode = nodeById[rootId];
-        if (rootNode) {
-            linkGrad.attr('x1', rootNode.tx).attr('y1', rootNode.ty).attr('x2', rootNode.tx).attr('y2', rootNode.ty - 300);
-        }
 
         var linkElements = linkGroup.selectAll('path').data(edgesProcessed).enter()
             .append('path').attr('class', 'graph-link')
-            .attr('stroke', '#555555')
-            .attr('stroke-width', function (d) { return d.source.depth === 0 ? 2 : 1.5; })
+            .attr('stroke', isDark ? '#4a4a4a' : '#c0c0c0')
+            .attr('stroke-width', function (d) { return d.source.depth === 0 ? 2 : 1.25; })
             .attr('stroke-opacity', 0)
             .attr('d', function (d) { return curvePath(d.source, d.target); });
 
@@ -269,79 +319,78 @@ const GraphRenderer = (function () {
             .attr('opacity', 0)
             .attr('transform', function (d) { return 'translate(' + d.tx + ',' + d.ty + ')'; });
 
-        // основной rect — строгий стиль
         nodeElements.append('rect').attr('class', 'node-card-rect')
             .attr('width', function (d) { return d.cardWidth; })
             .attr('height', function (d) { return d.cardHeight; })
             .attr('x', function (d) { return -d.cardWidth / 2; })
             .attr('y', function (d) { return -d.cardHeight / 2; })
-            .attr('rx', 2).attr('ry', 2)
-            .attr('fill', function (d) {
-                if (d.depth === 0) return '#1a1a1a';
-                return '#111111';
-            })
+            .attr('rx', 12).attr('ry', 12)
+            .attr('fill', function (d) { return 'url(#card-gradient-' + (d.depth === 0 ? 'root' : 'l' + Math.min(d.depth, 4)) + ')'; })
             .attr('stroke', function (d) {
-                if (d.depth === 0) return '#555555';
-                var diff = d.difficulty || 3;
-                if (diff <= 2) return '#444444';
-                if (diff === 3) return '#333333';
-                return '#222222';
+                if (isDark) return d.depth === 0 ? '#5f5f5f' : '#2e2e2e';
+                return d.depth === 0 ? '#b8b8b8' : '#d6d6d6';
             })
-            .attr('stroke-width', function (d) { return d.depth === 0 ? 1.5 : 1; });
+            .attr('stroke-width', function (d) { return d.depth === 0 ? 1.5 : 1; })
+            .attr('filter', 'url(#card-shadow)');
 
-        // заголовок
-        nodeElements.append('text').attr('class', 'node-card-title')
-            .text(function (d) { return truncateText(d.label, 22); })
-            .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
-            .attr('x', 0)
-            .attr('y', function (d) { return d.depth === 0 ? -8 : -6; })
-            .attr('font-size', function (d) { return d.depth === 0 ? '11px' : d.depth === 1 ? '10px' : '9px'; })
-            .attr('fill', function (d) { return isDark ? '#e0e0e0' : '#1a1a1a'; });
-
-        // описание (1 строка)
-        nodeElements.append('text').attr('class', 'node-card-desc')
-            .text(function (d) {
-                if (!d.description) return '';
-                return truncateText(shortDescription(d.description), 30);
-            })
-            .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
-            .attr('x', 0)
-            .attr('y', function (d) { return d.depth === 0 ? 8 : 7; })
-            .attr('font-size', '7px')
-            .attr('fill', function (d) { return isDark ? '#888888' : '#666666'; })
-            .attr('opacity', function (d) { return d.description ? 0.8 : 0; });
-
-        // мета: время (снизу)
-        nodeElements.append('text').attr('class', 'node-card-meta')
-            .text(function (d) {
-                var parts = [];
-                if (d.time) parts.push(d.time);
-                return parts.join('  ');
-            })
-            .attr('text-anchor', 'middle').attr('dominant-baseline', 'auto')
-            .attr('x', 0)
-            .attr('y', function (d) { return d.cardHeight / 2 - 8; })
-            .attr('font-size', '7px')
-            .attr('fill', function (d) { return isDark ? '#666666' : '#999999'; })
-            .attr('opacity', 0.7);
-
-        // шкала сложности (точки снизу-слева)
         nodeElements.each(function (d) {
             var g = d3.select(this);
-            var diff = d.difficulty || 3;
-            var startX = -d.cardWidth / 2 + 10;
-            var y = d.cardHeight / 2 - 8;
+            var isRoot = d.depth === 0;
+
+            // цветная полоска-акцент сверху (цвет = сложность)
+            g.append('rect').attr('class', 'node-accent-bar')
+                .attr('width', 34).attr('height', 3).attr('rx', 1.5)
+                .attr('x', -17)
+                .attr('y', -d.cardHeight / 2 + 10)
+                .attr('fill', difficultyColor(d.difficulty || 3))
+                .attr('opacity', 0.85);
+
+            // заголовок — до 2 строк
+            var titleLines = wrapTitle(d.label || '', isRoot ? 26 : 23);
+            var titleStartY = -d.cardHeight / 2 + 34;
+            titleLines.forEach(function (line, i) {
+                g.append('text').attr('class', 'node-card-title')
+                    .text(line)
+                    .attr('text-anchor', 'middle')
+                    .attr('x', 0)
+                    .attr('y', titleStartY + i * 17)
+                    .attr('font-size', isRoot ? '14px' : '12.5px')
+                    .attr('fill', isDark ? '#ececec' : '#1a1a1a');
+            });
+
+            // описание — одна строка, ниже заголовка
+            if (d.description) {
+                var descY = Math.max(d.cardHeight / 2 - 32, titleStartY + (titleLines.length - 1) * 17 + 14);
+                g.append('text').attr('class', 'node-card-desc')
+                    .text(truncateText(shortDescription(d.description), 34))
+                    .attr('text-anchor', 'middle')
+                    .attr('x', 0)
+                    .attr('y', descY)
+                    .attr('font-size', '10px')
+                    .attr('fill', isDark ? '#8f8f8f' : '#666666');
+            }
+
+            // сложность — точки слева снизу
+            var diff = Math.min(5, Math.max(1, d.difficulty || 3));
+            var footY = d.cardHeight / 2 - 14;
+            var startX = -d.cardWidth / 2 + 14;
             for (var i = 0; i < 5; i++) {
-                g.append('circle')
-                    .attr('cx', startX + i * 8)
-                    .attr('cy', y)
-                    .attr('r', 2)
-                    .attr('fill', function () {
-                        if (i >= diff) return '#1a1a1a';
-                        if (diff <= 2) return '#666666';
-                        if (diff === 3) return '#555555';
-                        return '#444444';
-                    });
+                g.append('circle').attr('class', 'node-diff-dot')
+                    .attr('cx', startX + i * 9)
+                    .attr('cy', footY)
+                    .attr('r', 2.5)
+                    .attr('fill', i < diff ? difficultyColor(diff) : (isDark ? '#262626' : '#dcdcdc'));
+            }
+
+            // время — справа снизу
+            if (d.time) {
+                g.append('text').attr('class', 'node-card-time')
+                    .text(truncateText(d.time, 16))
+                    .attr('text-anchor', 'end')
+                    .attr('x', d.cardWidth / 2 - 14)
+                    .attr('y', footY + 3.5)
+                    .attr('font-size', '9px')
+                    .attr('fill', isDark ? '#787878' : '#888888');
             }
         });
 
@@ -355,19 +404,18 @@ const GraphRenderer = (function () {
         nodeElements.on('mouseenter', function (event, d) { applyHoverEffect(d.id); })
             .on('mouseleave', function () { removeHoverEffect(); });
 
-        // анимация волнами
+        // анимация: волны по уровням, карточка выезжает из родительской
         var nodesByDepth = {};
         nodesFlat.forEach(function (n) {
             if (!nodesByDepth[n.depth]) nodesByDepth[n.depth] = [];
             nodesByDepth[n.depth].push(n);
         });
         var sortedDepths = Object.keys(nodesByDepth).map(Number).sort(function (a, b) { return a - b; });
-        var cumDelay = 0;
-        var waveDelay = 180;
+        var cumDelay = 200;
 
         sortedDepths.forEach(function (dep) {
             nodesByDepth[dep].forEach(function (nd, idx) {
-                var delay = waveDelay + cumDelay + idx * 40;
+                var delay = cumDelay + idx * 60;
                 setTimeout(function () {
                     var sel = nodeElements.filter(function (n) { return n.id === nd.id; });
                     var sx = width / 2, sy = height / 2;
@@ -375,48 +423,56 @@ const GraphRenderer = (function () {
                         var pl = d3Hierarchy.links().find(function (l) { return l.target.data.id === nd.id; });
                         if (pl) { sx = nodeById[pl.source.data.id].tx; sy = nodeById[pl.source.data.id].ty; }
                     }
-                    sel.attr('transform', 'translate(' + sx + ',' + sy + ') scale(0.2)').attr('opacity', 0)
-                        .transition().duration(400).ease(d3.easeCubicOut)
+                    sel.attr('transform', 'translate(' + sx + ',' + sy + ') scale(0.45)').attr('opacity', 0)
+                        .transition().duration(520).ease(d3.easeBackOut.overshoot(1.3))
                         .attr('opacity', 1).attr('transform', 'translate(' + nd.tx + ',' + nd.ty + ') scale(1)');
                 }, delay);
             });
-            cumDelay += nodesByDepth[dep].length * 40 + 350;
+            cumDelay += nodesByDepth[dep].length * 60 + 320;
         });
 
-        // линии
+        // линии — плавная прорисовка
         var linksByDepth = {};
         edgesProcessed.forEach(function (e) {
             if (!linksByDepth[e.source.depth]) linksByDepth[e.source.depth] = [];
             linksByDepth[e.source.depth].push(e);
         });
         var sortedLinkDeps = Object.keys(linksByDepth).map(Number).sort(function (a, b) { return a - b; });
-        var linkDelay = waveDelay + 250;
+        var linkDelay = 420;
         sortedLinkDeps.forEach(function (dep) {
             setTimeout(function () {
                 linkElements.filter(function (l) { return l.source.depth === dep; }).each(function () {
                     var pathEl = d3.select(this);
                     var totalLen = this.getTotalLength();
                     pathEl.attr('stroke-dasharray', totalLen).attr('stroke-dashoffset', totalLen)
-                        .attr('stroke-opacity', 0.4)
-                        .transition().duration(750).ease(d3.easeQuadOut).attr('stroke-dashoffset', 0);
+                        .attr('stroke-opacity', isDark ? 0.5 : 0.8)
+                        .transition().duration(700).ease(d3.easeQuadOut).attr('stroke-dashoffset', 0);
                 });
             }, linkDelay);
-            linkDelay += 250;
+            linkDelay += 280;
         });
 
-        // фокус на корень
-        var totalAnimTime = waveDelay + sortedDepths.length * 400 + 500;
+        // плавный фокус: вписываем всё дерево в экран
+        var totalAnimTime = cumDelay + 400;
         setTimeout(function () {
-            if (!rootNode) return;
-            var scale = 0.85;
-            var tx = width / 2 - rootNode.tx * scale;
-            var ty = height / 2 - rootNode.ty * scale;
+            var bx1 = Infinity, bx2 = -Infinity, by1 = Infinity, by2 = -Infinity;
+            nodesFlat.forEach(function (n) {
+                if (n.tx - n.cardWidth / 2 < bx1) bx1 = n.tx - n.cardWidth / 2;
+                if (n.tx + n.cardWidth / 2 > bx2) bx2 = n.tx + n.cardWidth / 2;
+                if (n.ty - n.cardHeight / 2 < by1) by1 = n.ty - n.cardHeight / 2;
+                if (n.ty + n.cardHeight / 2 > by2) by2 = n.ty + n.cardHeight / 2;
+            });
+            var bw = Math.max(1, bx2 - bx1), bh = Math.max(1, by2 - by1);
+            var scale = Math.min(1, (width - 120) / bw, (height - 180) / bh);
+            scale = Math.max(scale, 0.2);
+            var tx = width / 2 - (bx1 + bx2) / 2 * scale;
+            var ty = height / 2 - (by1 + by2) / 2 * scale;
             var transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
-            svg.transition().duration(800).ease(d3.easeCubicInOut).call(zoomBehavior.transform, transform);
+            svg.transition().duration(900).ease(d3.easeCubicInOut).call(zoomBehavior.transform, transform);
         }, totalAnimTime);
 
         // публичный метод для подсветки связей
-        window._graphHighlight = function (nodeId) {
+window._graphHighlight = function (nodeId) {
             highlightConnections(nodeId, nodesFlat);
         };
     }
