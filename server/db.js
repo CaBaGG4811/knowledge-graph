@@ -37,6 +37,18 @@ function ensureInit() {
                 )
             `);
 
+            db.run(`
+                CREATE TABLE IF NOT EXISTS saved_cards (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    label TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    difficulty INTEGER DEFAULT 3,
+                    time TEXT,
+                    topic TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             // дефолтные настройки
             var defaults = {
                 theme: 'dark',

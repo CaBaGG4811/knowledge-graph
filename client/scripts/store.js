@@ -16,8 +16,8 @@ const Store = (function () {
     function applySettings(s) {
         var root = document.documentElement;
         root.setAttribute('data-theme', 'dark');
-        var sizes = { small: '12px', medium: '13px', large: '14px' };
-        root.style.setProperty('--font-size-base', sizes[s.fontSize] || '13px');
+        root.setAttribute('data-font-size', s.fontSize || 'medium');
+        root.style.setProperty('--font-size-base', '13px');
     }
 
     return { get: get, set: set, applySettings: applySettings };

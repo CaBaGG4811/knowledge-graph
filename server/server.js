@@ -7,6 +7,7 @@ const { ensureInit } = require('./db');
 const treesRoutes = require('./routes/trees');
 const generateRoutes = require('./routes/generate');
 const settingsRoutes = require('./routes/settings');
+const cardsRoutes = require('./routes/cards');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,6 +25,7 @@ app.use(express.static(path.join(__dirname, '..', 'client')));
 app.use('/api/trees', treesRoutes);
 app.use('/api/generate', generateRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/cards', cardsRoutes);
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));

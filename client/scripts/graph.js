@@ -17,6 +17,14 @@ const GraphRenderer = (function () {
         return '#ef4444';
     }
 
+    // масштаб текста карточек из настроек внешнего вида
+    function fontScale() {
+        var s = (typeof Store !== 'undefined' && Store.get('settings')) || {};
+        if (s.fontSize === 'small') return 0.88;
+        if (s.fontSize === 'large') return 1.18;
+        return 1;
+    }
+
     var currentEdgesProcessed = [];
 
     function truncateText(text, maxLen) {
@@ -195,6 +203,7 @@ const GraphRenderer = (function () {
         if (!container) return;
         container.innerHTML = '';
         currentEdgesProcessed = [];
+        if (typeof ModalManager !== 'undefined' && ModalManager.setTopic) ModalManager.setTopic(topicName);
 
         var width = window.innerWidth;
         var height = window.innerHeight;
@@ -346,6 +355,7 @@ const GraphRenderer = (function () {
                 .attr('opacity', 0.85);
 
             // заголовок — до 2 строк
+            var fs = fontScale();
             var titleLines = wrapTitle(d.label || '', isRoot ? 26 : 23);
             var titleStartY = -d.cardHeight / 2 + 34;
             titleLines.forEach(function (line, i) {
@@ -354,7 +364,7 @@ const GraphRenderer = (function () {
                     .attr('text-anchor', 'middle')
                     .attr('x', 0)
                     .attr('y', titleStartY + i * 17)
-                    .attr('font-size', isRoot ? '14px' : '12.5px')
+                    .attr('font-size', ((isRoot ? 14 : 12.5) * fs).toFixed(2) + 'px')
                     .attr('fill', isDark ? '#ececec' : '#1a1a1a');
             });
 
@@ -366,7 +376,7 @@ const GraphRenderer = (function () {
                     .attr('text-anchor', 'middle')
                     .attr('x', 0)
                     .attr('y', descY)
-                    .attr('font-size', '10px')
+                    .attr('font-size', (10 * fs).toFixed(2) + 'px')
                     .attr('fill', isDark ? '#8f8f8f' : '#666666');
             }
 
@@ -389,7 +399,7 @@ const GraphRenderer = (function () {
                     .attr('text-anchor', 'end')
                     .attr('x', d.cardWidth / 2 - 14)
                     .attr('y', footY + 3.5)
-                    .attr('font-size', '9px')
+                    .attr('font-size', (9 * fs).toFixed(2) + 'px')
                     .attr('fill', isDark ? '#787878' : '#888888');
             }
         });

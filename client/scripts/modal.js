@@ -2,7 +2,9 @@
 const ModalManager = (function () {
     'use strict';
 
-    var overlay, currentNode = null, currentGraphData = null;
+    var overlay, currentNode = null, currentGraphData = null, currentTopic = null;
+
+    function setTopic(topic) { currentTopic = topic || null; }
 
     function ensureDom() {
         if (overlay) return;
@@ -99,6 +101,10 @@ const ModalManager = (function () {
                 <button class="modal-action-btn" data-action="quiz"><span class="ma-icon">?</span> ${t('actionQuiz')}</button>
                 <button class="modal-action-btn" data-action="mistakes"><span class="ma-icon">!</span> ${t('actionMistakes')}</button>
                 <button class="modal-action-btn" data-action="summary"><span class="ma-icon">&equiv;</span> ${t('actionSummary')}</button>
+                <button class="modal-action-btn modal-save-card-btn" data-action="saveCard" id="modal-save-card-btn">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+                    ${t('saveCardBtn')}
+                </button>
             </div>
 
             <div class="modal-ai-result" id="modal-ai-result"></div>
@@ -106,7 +112,11 @@ const ModalManager = (function () {
 
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
         card.querySelectorAll('.modal-action-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () { handleAction(btn.getAttribute('data-action')); });
+            if (btn.getAttribute('data-action') === 'saveCard') {
+                btn.addEventListener('click', function () { saveCurrentCard(btn); });
+            } else {
+                btn.addEventListener('click', function () { handleAction(btn.getAttribute('data-action')); });
+            }
         });
         card.querySelectorAll('.modal-link').forEach(function (link) {
             link.addEventListener('click', function () {
@@ -127,6 +137,26 @@ const ModalManager = (function () {
     function closeModal() {
         if (overlay) overlay.classList.add('hidden');
         currentNode = null;
+    }
+
+    async function saveCurrentCard(btn) {
+        var t = I18n.t;
+        if (!currentNode) return;
+        try {
+            btn.disabled = true;
+            await API.post('/api/cards', {
+                label: currentNode.label,
+                description: currentNode.description || '',
+                difficulty: currentNode.difficulty || 3,
+                time: currentNode.time || '',
+                topic: currentTopic || ''
+            });
+            btn.innerHTML = '<span class="ma-icon">&#10003;</span> ' + t('cardSaved');
+            Toast.show(t('cardSaved'), 'success');
+        } catch (err) {
+            btn.disabled = false;
+            Toast.show(err.message, 'error');
+        }
     }
 
     async function handleAction(action) {
@@ -222,5 +252,5 @@ const ModalManager = (function () {
         URL.revokeObjectURL(url);
     }
 
-    return { openModal: openModal, openModalById: openModalById, closeModal: closeModal };
+    return { openModal: openModal, openModalById: openModalById, closeModal: closeModal, setTopic: setTopic };
 })();

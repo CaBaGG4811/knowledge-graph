@@ -29,9 +29,24 @@ const HomePage = (function () {
         content.innerHTML = `
             <div class="home-layout">
                 <aside class="home-sidebar" id="home-sidebar">
-                    <div class="sidebar-header">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>${t('menuHistory')}</span>
+                    <div class="side-menu">
+                        <button class="side-btn" id="side-search-btn" title="${t('menuSearchChats')}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <span>${t('menuSearchChats')}</span>
+                        </button>
+                        <button class="side-btn" id="side-library-btn" title="${t('menuLibrary')}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                            <span>${t('menuLibrary')}</span>
+                            <svg class="side-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                        <div class="side-search-panel hidden" id="side-search-panel">
+                            <input type="text" class="side-search-input" id="side-search-input" placeholder="${t('searchChatsPlaceholder')}" autocomplete="off">
+                        </div>
+                        <div class="side-library-panel hidden" id="side-library-panel">
+                            <div class="side-library-grid" id="side-library-grid">
+                                <div class="side-lib-empty">${t('libraryEmpty')}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="sidebar-list" id="sidebar-list">
                         <div class="sidebar-empty">${t('historyEmpty')}</div>
@@ -123,6 +138,148 @@ const HomePage = (function () {
         document.getElementById('sidebar-settings').addEventListener('click', function () {
             window.location.hash = '#/settings';
         });
+
+        // ——— боковая панель: поиск чатов ———
+        var searchBtn = document.getElementById('side-search-btn');
+        var searchPanel = document.getElementById('side-search-panel');
+        var searchInput = document.getElementById('side-search-input');
+        searchBtn.addEventListener('click', function () {
+            closeLibraryPanel();
+            searchPanel.classList.toggle('hidden');
+            if (!searchPanel.classList.contains('hidden')) {
+                document.getElementById('sidebar-list').classList.remove('hidden');
+                searchInput.focus();
+            } else {
+                filterSidebar('');
+                searchInput.value = '';
+            }
+        });
+        searchPanel.addEventListener('click', function (e) { e.stopPropagation(); });
+        searchInput.addEventListener('input', function () {
+            filterSidebar(searchInput.value.trim().toLowerCase());
+        });
+
+        // ——— боковая панель: моя библиотека ———
+        var libraryBtn = document.getElementById('side-library-btn');
+        libraryBtn.addEventListener('click', function () {
+            var panel = document.getElementById('side-library-panel');
+            var willOpen = panel.classList.contains('hidden');
+            searchPanel.classList.add('hidden');
+            panel.classList.toggle('hidden');
+            libraryBtn.classList.toggle('open', willOpen);
+            if (willOpen) loadLibrary();
+        });
+    }
+
+    function closeLibraryPanel() {
+        var panel = document.getElementById('side-library-panel');
+        var btn = document.getElementById('side-library-btn');
+        if (panel) panel.classList.add('hidden');
+        if (btn) btn.classList.remove('open');
+    }
+
+    function filterSidebar(query) {
+        var list = document.getElementById('sidebar-list');
+        if (!list) return;
+        var items = list.querySelectorAll('.sidebar-item');
+        if (!query) {
+            items.forEach(function (it) { it.style.display = ''; });
+            var emptyEl = list.querySelector('.sidebar-empty-search');
+            if (emptyEl) emptyEl.remove();
+            return;
+        }
+        var found = 0;
+        items.forEach(function (it) {
+            var nameEl = it.querySelector('.sidebar-item-name');
+            var name = nameEl ? nameEl.textContent.toLowerCase() : '';
+            var show = name.indexOf(query) !== -1;
+            it.style.display = show ? '' : 'none';
+            if (show) found++;
+        });
+        var emptyEl = list.querySelector('.sidebar-empty-search');
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.className = 'sidebar-empty sidebar-empty-search';
+            list.appendChild(emptyEl);
+        }
+        emptyEl.textContent = found === 0 ? I18n.t('searchChatsEmpty') : '';
+        emptyEl.style.display = found === 0 ? '' : 'none';
+    }
+
+    /* ============================================
+       Библиотека сохранённых карточек
+       ============================================ */
+
+    function escapeHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function libDifficultyColor(level) {
+        if (level <= 2) return '#22c55e';
+        if (level === 3) return '#eab308';
+        if (level === 4) return '#f97316';
+        return '#ef4444';
+    }
+
+    async function loadLibrary() {
+        var t = I18n.t;
+        var grid = document.getElementById('side-library-grid');
+        if (!grid) return;
+        grid.innerHTML = '<div class="side-lib-empty"><div class="modal-spinner"></div></div>';
+        try {
+            var data = await API.get('/api/cards');
+            if (!data.cards || data.cards.length === 0) {
+                grid.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('libraryEmpty')) + '</div>';
+                return;
+            }
+            grid.innerHTML = '';
+            data.cards.forEach(function (card) {
+                grid.appendChild(buildLibraryTile(card, grid));
+            });
+        } catch (err) {
+            grid.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('errorPrefix') + err.message) + '</div>';
+        }
+    }
+
+    function buildLibraryTile(card, grid) {
+        var t = I18n.t;
+        var tile = document.createElement('div');
+        tile.className = 'side-card-tile';
+        var desc = String(card.description || '');
+        tile.innerHTML =
+            '<div class="side-card-top">' +
+                '<span class="side-card-diff" style="background:' + libDifficultyColor(card.difficulty || 3) + '"></span>' +
+                (card.topic ? '<span class="side-card-topic">' + escapeHtml(card.topic) + '</span>' : '') +
+                '<button class="side-card-del" title="' + escapeHtml(t('cardDeleted')) + '">' +
+                    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+                '</button>' +
+            '</div>' +
+            '<div class="side-card-label">' + escapeHtml(card.label) + '</div>' +
+            '<div class="side-card-desc">' + escapeHtml(desc.length > 70 ? desc.slice(0, 69) + '\u2026' : desc) + '</div>';
+
+        tile.addEventListener('click', function () {
+            ModalManager.setTopic(card.topic);
+            ModalManager.openModal(
+                { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time },
+                { nodes: [], edges: [] }
+            );
+        });
+
+        tile.querySelector('.side-card-del').addEventListener('click', function (e) {
+            e.stopPropagation();
+            API.del('/api/cards/' + card.id).then(function () {
+                tile.remove();
+                if (!grid.querySelector('.side-card-tile')) {
+                    grid.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('libraryEmpty')) + '</div>';
+                }
+                Toast.show(t('cardDeleted'), 'success');
+            }).catch(function (err) {
+                Toast.show(err.message, 'error');
+            });
+        });
+        return tile;
     }
 
     /* ============================================
