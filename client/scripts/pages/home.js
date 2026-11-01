@@ -39,12 +39,17 @@ const HomePage = (function () {
                             <span>${t('menuLibrary')}</span>
                             <svg class="side-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                         </button>
-                        <div class="side-search-panel hidden" id="side-search-panel">
-                            <input type="text" class="side-search-input" id="side-search-input" placeholder="${t('searchChatsPlaceholder')}" autocomplete="off">
-                        </div>
                         <div class="side-library-panel hidden" id="side-library-panel">
-                            <div class="side-library-grid" id="side-library-grid">
-                                <div class="side-lib-empty">${t('libraryEmpty')}</div>
+                            <div class="side-lib-carousel-wrapper">
+                                <button class="side-lib-nav left" id="side-lib-nav-left" aria-label="‹">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                                </button>
+                                <div class="side-library-track" id="side-library-track">
+                                    <div class="side-lib-empty">${t('libraryEmpty')}</div>
+                                </div>
+                                <button class="side-lib-nav right" id="side-lib-nav-right" aria-label="›">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -140,74 +145,265 @@ const HomePage = (function () {
         });
 
         // ——— боковая панель: поиск чатов ———
-        var searchBtn = document.getElementById('side-search-btn');
-        var searchPanel = document.getElementById('side-search-panel');
-        var searchInput = document.getElementById('side-search-input');
-        searchBtn.addEventListener('click', function () {
-            closeLibraryPanel();
-            searchPanel.classList.toggle('hidden');
-            if (!searchPanel.classList.contains('hidden')) {
-                document.getElementById('sidebar-list').classList.remove('hidden');
-                searchInput.focus();
-            } else {
-                filterSidebar('');
-                searchInput.value = '';
-            }
-        });
-        searchPanel.addEventListener('click', function (e) { e.stopPropagation(); });
-        searchInput.addEventListener('input', function () {
-            filterSidebar(searchInput.value.trim().toLowerCase());
+        document.getElementById('side-search-btn').addEventListener('click', function () {
+            openSearchModal();
         });
 
-        // ——— боковая панель: моя библиотека ———
+        // ——— боковая панель: моё творчество ———
         var libraryBtn = document.getElementById('side-library-btn');
         libraryBtn.addEventListener('click', function () {
             var panel = document.getElementById('side-library-panel');
             var willOpen = panel.classList.contains('hidden');
-            searchPanel.classList.add('hidden');
             panel.classList.toggle('hidden');
             libraryBtn.classList.toggle('open', willOpen);
             if (willOpen) loadLibrary();
         });
+
+        var track = document.getElementById('side-library-track');
+        var navLeft = document.getElementById('side-lib-nav-left');
+        var navRight = document.getElementById('side-lib-nav-right');
+        if (track && navLeft && navRight) {
+            navLeft.addEventListener('click', function () {
+                track.scrollBy({ left: -170, behavior: 'smooth' });
+            });
+            navRight.addEventListener('click', function () {
+                track.scrollBy({ left: 170, behavior: 'smooth' });
+            });
+            track.addEventListener('scroll', updateLibraryNav);
+            window.addEventListener('resize', updateLibraryNav);
+        }
     }
 
-    function closeLibraryPanel() {
-        var panel = document.getElementById('side-library-panel');
-        var btn = document.getElementById('side-library-btn');
-        if (panel) panel.classList.add('hidden');
-        if (btn) btn.classList.remove('open');
-    }
-
-    function filterSidebar(query) {
-        var list = document.getElementById('sidebar-list');
-        if (!list) return;
-        var items = list.querySelectorAll('.sidebar-item');
-        if (!query) {
-            items.forEach(function (it) { it.style.display = ''; });
-            var emptyEl = list.querySelector('.sidebar-empty-search');
-            if (emptyEl) emptyEl.remove();
-            return;
-        }
-        var found = 0;
-        items.forEach(function (it) {
-            var nameEl = it.querySelector('.sidebar-item-name');
-            var name = nameEl ? nameEl.textContent.toLowerCase() : '';
-            var show = name.indexOf(query) !== -1;
-            it.style.display = show ? '' : 'none';
-            if (show) found++;
-        });
-        var emptyEl = list.querySelector('.sidebar-empty-search');
-        if (!emptyEl) {
-            emptyEl = document.createElement('div');
-            emptyEl.className = 'sidebar-empty sidebar-empty-search';
-            list.appendChild(emptyEl);
-        }
-        emptyEl.textContent = found === 0 ? I18n.t('searchChatsEmpty') : '';
-        emptyEl.style.display = found === 0 ? '' : 'none';
+    function updateLibraryNav() {
+        var track = document.getElementById('side-library-track');
+        var navLeft = document.getElementById('side-lib-nav-left');
+        var navRight = document.getElementById('side-lib-nav-right');
+        if (!track || !navLeft || !navRight) return;
+        var scrollable = track.scrollWidth > track.clientWidth + 4;
+        navLeft.classList.toggle('visible', scrollable && track.scrollLeft > 4);
+        navRight.classList.toggle('visible', scrollable && track.scrollLeft < track.scrollWidth - track.clientWidth - 4);
     }
 
     /* ============================================
-       Библиотека сохранённых карточек
+       Модальный поиск: чаты + карточки
+       ============================================ */
+
+    var searchData = null;
+    var searchHistory = null;
+    var searchTimer = null;
+
+    function getSearchHistory() {
+        if (searchHistory === null) {
+            try { searchHistory = JSON.parse(localStorage.getItem('kg_search_history') || '[]'); }
+            catch (e) { searchHistory = []; }
+            if (!Array.isArray(searchHistory)) searchHistory = [];
+        }
+        return searchHistory;
+    }
+
+    function rememberQuery(q) {
+        if (!q) return;
+        var h = getSearchHistory();
+        h = h.filter(function (x) { return x !== q; });
+        h.unshift(q);
+        searchHistory = h.slice(0, 8);
+        try { localStorage.setItem('kg_search_history', JSON.stringify(searchHistory)); } catch (e) {}
+    }
+
+    function ensureSearchOverlay() {
+        if (document.getElementById('search-overlay')) return;
+        var overlay = document.createElement('div');
+        overlay.id = 'search-overlay';
+        overlay.className = 'search-overlay hidden';
+        var t = I18n.t;
+        overlay.innerHTML =
+            '<div class="search-backdrop"></div>' +
+            '<div class="search-modal">' +
+                '<div class="search-input-row">' +
+                    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+                    '<input type="text" id="search-modal-input" class="search-modal-input" placeholder="' + escapeHtml(t('searchChatsPlaceholder')) + '" autocomplete="off">' +
+                '</div>' +
+                '<div class="search-results" id="search-modal-results"></div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        var input = overlay.querySelector('#search-modal-input');
+        input.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(function () { runSearch(input.value.trim().toLowerCase()); }, 180);
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') rememberQuery(input.value.trim());
+            if (e.key === 'Escape') { e.stopPropagation(); closeSearchModal(); }
+        });
+        overlay.querySelector('.search-backdrop').addEventListener('click', closeSearchModal);
+    }
+
+    function openSearchModal() {
+        ensureSearchOverlay();
+        var overlay = document.getElementById('search-overlay');
+        var input = document.getElementById('search-modal-input');
+        var results = document.getElementById('search-modal-results');
+        overlay.classList.remove('hidden');
+        input.value = '';
+        results.innerHTML = '<div class="search-empty"><div class="modal-spinner"></div></div>';
+        input.focus();
+        loadSearchData();
+    }
+
+    function closeSearchModal() {
+        var overlay = document.getElementById('search-overlay');
+        if (overlay) overlay.classList.add('hidden');
+    }
+
+    async function loadSearchData() {
+        try {
+            var items = await Promise.all([API.get('/api/trees'), API.get('/api/cards')]);
+            searchData = {
+                trees: (items[0] && items[0].trees) || [],
+                cards: (items[1] && items[1].cards) || []
+            };
+        } catch (err) {
+            searchData = { trees: [], cards: [], error: err.message };
+        }
+        var input = document.getElementById('search-modal-input');
+        var q = input ? input.value.trim().toLowerCase() : '';
+        if (q) { runSearch(q); } else { renderSearchHistory(); }
+    }
+
+    function fadeSwapSearch(renderFn) {
+        var results = document.getElementById('search-modal-results');
+        if (!results) return;
+        results.classList.add('search-fading');
+        setTimeout(function () {
+            renderFn();
+            results.classList.remove('search-fading');
+        }, 150);
+    }
+
+    function runSearch(q) {
+        if (!q) {
+            fadeSwapSearch(renderSearchHistory);
+            return;
+        }
+        fadeSwapSearch(function () { renderSearchResults(q); });
+    }
+
+    function renderSearchHistory() {
+        var t = I18n.t;
+        var results = document.getElementById('search-modal-results');
+        if (!results) return;
+        var h = getSearchHistory();
+        if (!h.length) {
+            results.innerHTML = '<div class="search-empty">' + escapeHtml(t('searchHistoryEmpty')) + '</div>';
+            return;
+        }
+        results.innerHTML = '<div class="search-group-title">' + escapeHtml(t('searchHistoryTitle') || '') + '</div>';
+        h.forEach(function (q) {
+            var row = document.createElement('button');
+            row.className = 'search-row';
+            row.innerHTML =
+                '<svg class="search-row-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+                '<span class="search-row-text">' + escapeHtml(q) + '</span>';
+            row.addEventListener('click', function () {
+                var input = document.getElementById('search-modal-input');
+                input.value = q;
+                input.focus();
+                rememberQuery(q);
+                fadeSwapSearch(function () { renderSearchResults(q.toLowerCase()); });
+            });
+            results.appendChild(row);
+        });
+    }
+
+    function addSearchGroupTitle(resultsEl, title) {
+        var el = document.createElement('div');
+        el.className = 'search-group-title';
+        el.textContent = title;
+        resultsEl.appendChild(el);
+    }
+
+    function renderSearchResults(q) {
+        var t = I18n.t;
+        var results = document.getElementById('search-modal-results');
+        if (!results) return;
+        if (!searchData) {
+            results.innerHTML = '<div class="search-empty"><div class="modal-spinner"></div></div>';
+            return;
+        }
+        if (searchData.error) {
+            results.innerHTML = '<div class="search-empty">' + escapeHtml(t('errorPrefix') + searchData.error) + '</div>';
+            return;
+        }
+
+        var foundTrees = searchData.trees.filter(function (tree) {
+            var name = String(tree.name || tree.topic || '').toLowerCase();
+            var topic = String(tree.topic || '').toLowerCase();
+            return name.indexOf(q) !== -1 || topic.indexOf(q) !== -1;
+        });
+        var foundCards = searchData.cards.filter(function (card) {
+            var hay = (String(card.label || '') + ' ' + String(card.description || '') + ' ' + String(card.topic || '')).toLowerCase();
+            return hay.indexOf(q) !== -1;
+        });
+
+        if (!foundTrees.length && !foundCards.length) {
+            results.innerHTML = '<div class="search-empty">' + escapeHtml(t('searchChatsEmpty')) + '</div>';
+            return;
+        }
+
+        var clockSvg = '<svg class="search-row-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+        var cardSvg = '<svg class="search-row-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg>';
+
+        if (foundTrees.length) {
+            addSearchGroupTitle(results, t('searchGroupChats'));
+            foundTrees.forEach(function (tree) {
+                var row = document.createElement('button');
+                row.className = 'search-row';
+                var dateStr = tree.created_at ? new Date(tree.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
+                row.innerHTML = clockSvg +
+                    '<span class="search-row-text">' + escapeHtml(tree.name || tree.topic || '—') + '</span>' +
+                    (dateStr ? '<span class="search-row-hint">' + escapeHtml(dateStr) + '</span>' : '');
+                row.addEventListener('click', function () {
+                    rememberCurrentSearch();
+                    try {
+                        var gd = typeof tree.graph_data === 'string' ? JSON.parse(tree.graph_data) : tree.graph_data;
+                        closeSearchModal();
+                        window.location.hash = '#/app';
+                        showGraph(gd, tree.topic || tree.name);
+                    } catch (e) { Toast.show(t('loadError'), 'error'); }
+                });
+                results.appendChild(row);
+            });
+        }
+
+        if (foundCards.length) {
+            addSearchGroupTitle(results, t('menuLibrary'));
+            foundCards.forEach(function (card) {
+                var row = document.createElement('button');
+                row.className = 'search-row';
+                row.innerHTML = cardSvg +
+                    '<span class="search-row-text">' + escapeHtml(card.label) + '</span>' +
+                    (card.topic ? '<span class="search-row-hint">' + escapeHtml(card.topic) + '</span>' : '');
+                row.addEventListener('click', function () {
+                    rememberCurrentSearch();
+                    ModalManager.setTopic(card.topic);
+                    ModalManager.openModal(
+                        { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time },
+                        { nodes: [], edges: [] }
+                    );
+                });
+                results.appendChild(row);
+            });
+        }
+    }
+
+    function rememberCurrentSearch() {
+        var input = document.getElementById('search-modal-input');
+        if (input) rememberQuery(input.value.trim());
+    }
+
+    /* ============================================
+       Библиотека сохранённых карточек (карусель)
        ============================================ */
 
     function escapeHtml(str) {
@@ -225,21 +421,23 @@ const HomePage = (function () {
 
     async function loadLibrary() {
         var t = I18n.t;
-        var grid = document.getElementById('side-library-grid');
-        if (!grid) return;
-        grid.innerHTML = '<div class="side-lib-empty"><div class="modal-spinner"></div></div>';
+        var track = document.getElementById('side-library-track');
+        if (!track) return;
+        track.innerHTML = '<div class="side-lib-empty"><div class="modal-spinner"></div></div>';
         try {
             var data = await API.get('/api/cards');
             if (!data.cards || data.cards.length === 0) {
-                grid.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('libraryEmpty')) + '</div>';
+                track.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('libraryEmpty')) + '</div>';
+                updateLibraryNav();
                 return;
             }
-            grid.innerHTML = '';
+            track.innerHTML = '';
             data.cards.forEach(function (card) {
-                grid.appendChild(buildLibraryTile(card, grid));
+                track.appendChild(buildLibraryTile(card, track));
             });
+            requestAnimationFrame(updateLibraryNav);
         } catch (err) {
-            grid.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('errorPrefix') + err.message) + '</div>';
+            track.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('errorPrefix') + err.message) + '</div>';
         }
     }
 
@@ -274,6 +472,7 @@ const HomePage = (function () {
                 if (!grid.querySelector('.side-card-tile')) {
                     grid.innerHTML = '<div class="side-lib-empty">' + escapeHtml(t('libraryEmpty')) + '</div>';
                 }
+                updateLibraryNav();
                 Toast.show(t('cardDeleted'), 'success');
             }).catch(function (err) {
                 Toast.show(err.message, 'error');
