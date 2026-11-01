@@ -386,6 +386,7 @@ const HomePage = (function () {
                     (card.topic ? '<span class="search-row-hint">' + escapeHtml(card.topic) + '</span>' : '');
                 row.addEventListener('click', function () {
                     rememberCurrentSearch();
+                    closeSearchModal();
                     ModalManager.setTopic(card.topic);
                     ModalManager.openModal(
                         { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time },
