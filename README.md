@@ -35,8 +35,6 @@ npm start
 
 5. Открой в браузере: http://localhost:3000
 
-> ⚠️ Не запускай `node server/server.js` из папки server — команда `node server/server.js` работает только из корня проекта. Из папки server используй `npm start`.
-
 ## Настройки
 
 В настройках можно указать URL и модель LLM сервера (LM Studio). API-ключ не требуется.
