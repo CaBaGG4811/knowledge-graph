@@ -22,19 +22,20 @@ git clone https://github.com/CaBaGG4811/knowledge-graph.git
 cd knowledge-graph
 ```
 
-3. Установи зависимости:
+3. Перейди в папку server и установи зависимости:
 ```bash
 cd server
 npm install
-cd ..
 ```
 
-4. Запусти сервер:
+4. Запусти сервер (из той же папки server):
 ```bash
-node server/server.js
+npm start
 ```
 
 5. Открой в браузере: http://localhost:3000
+
+> ⚠️ Не запускай `node server/server.js` из папки server — команда `node server/server.js` работает только из корня проекта. Из папки server используй `npm start`.
 
 ## Настройки
 
