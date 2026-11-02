@@ -24,6 +24,17 @@ router.get('/', (req, res) => {
     }
 });
 
+router.get('/exists', (req, res) => {
+    const label = String(req.query.label || '').trim();
+    if (!label) return res.json({ exists: false });
+    try {
+        const row = getOne('SELECT id FROM saved_cards WHERE label = ?', [label]);
+        res.json({ exists: !!row, id: row ? row.id : null });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 router.post('/', (req, res) => {
     const { label, description, difficulty, time, topic } = req.body || {};
     if (!label || !String(label).trim()) {

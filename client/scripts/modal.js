@@ -6,6 +6,12 @@ const ModalManager = (function () {
 
     function setTopic(topic) { currentTopic = topic || null; }
 
+    function escapeHtml(str) {
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function ensureDom() {
         if (overlay) return;
         overlay = document.createElement('div');
@@ -46,14 +52,14 @@ const ModalManager = (function () {
 
         var prereqs = getPrereqs(nodeData.id, graphData);
         var prereqHtml = prereqs.length
-            ? prereqs.map(function (p) { return '<a class="modal-link" data-id="' + p.id + '">' + p.label + '</a>'; }).join(', ')
+            ? prereqs.map(function (p) { return '<a class="modal-link" data-id="' + escapeHtml(p.id) + '">' + escapeHtml(p.label) + '</a>'; }).join(', ')
             : '<span class="modal-dim">' + t('noPrereqs') + '</span>';
 
         var leadsToHtml = '';
         if (nodeData.leadsTo && nodeData.leadsTo.length && graphData) {
             leadsToHtml = nodeData.leadsTo.map(function (id) {
                 var n = graphData.nodes.find(function (x) { return x.id === id; });
-                return n ? '<a class="modal-link" data-id="' + n.id + '">' + n.label + '</a>' : null;
+                return n ? '<a class="modal-link" data-id="' + escapeHtml(n.id) + '">' + escapeHtml(n.label) + '</a>' : null;
             }).filter(Boolean).join(', ');
         }
         if (!leadsToHtml) leadsToHtml = '<span class="modal-dim">' + t('endOfBranch') + '</span>';
@@ -63,30 +69,30 @@ const ModalManager = (function () {
             <button class="modal-close" id="modal-close-btn">&times;</button>
 
             <div class="modal-header">
-                <h2 class="modal-title">${nodeData.label}</h2>
+                <h2 class="modal-title">${escapeHtml(nodeData.label)}</h2>
                 <div class="modal-meta-row">
                     ${difficultyBar(nodeData.difficulty || 3)}
-                    ${nodeData.time ? '<span class="modal-time-badge">' + nodeData.time + '</span>' : ''}
+                    ${nodeData.time ? '<span class="modal-time-badge">' + escapeHtml(nodeData.time) + '</span>' : ''}
                 </div>
             </div>
 
             <div class="modal-body">
-                <div class="modal-block">
+                <div class="modal-block modal-stagger">
                     <div class="modal-block-label">${t('whatIs')}</div>
-                    <div class="modal-block-text">${nodeData.description || '—'}</div>
+                    <div class="modal-block-text">${escapeHtml(nodeData.description || '—')}</div>
                 </div>
 
-                <div class="modal-block">
+                <div class="modal-block modal-stagger">
                     <div class="modal-block-label">${t('whyLearn')}</div>
-                    <div class="modal-block-text">${nodeData.why && nodeData.why.indexOf('фундаментальная тема') === -1 ? nodeData.why : t('defaultWhy')}</div>
+                    <div class="modal-block-text">${escapeHtml(nodeData.why && nodeData.why.indexOf('фундаментальная тема') === -1 ? nodeData.why : t('defaultWhy'))}</div>
                 </div>
 
                 <div class="modal-dual">
-                    <div class="modal-block">
+                    <div class="modal-block modal-stagger">
                         <div class="modal-block-label">${t('prerequisites')}</div>
                         <div class="modal-block-text modal-links-container">${prereqHtml}</div>
                     </div>
-                    <div class="modal-block">
+                    <div class="modal-block modal-stagger">
                         <div class="modal-block-label">${t('leadsTo')}</div>
                         <div class="modal-block-text modal-links-container">${leadsToHtml}</div>
                     </div>
@@ -125,6 +131,17 @@ const ModalManager = (function () {
             });
         });
 
+        // если карточка уже сохранена в «Моё творчество» — кнопка гаснет
+        if (nodeData && nodeData.label) {
+            if (nodeData.saved_card_id) {
+                markCardSaved();
+            } else {
+                API.get('/api/cards/exists?label=' + encodeURIComponent(nodeData.label)).then(function (res) {
+                    if (res.exists && currentNode === nodeData) markCardSaved();
+                }).catch(function () {});
+            }
+        }
+
         overlay.classList.remove('hidden');
     }
 
@@ -139,6 +156,14 @@ const ModalManager = (function () {
         currentNode = null;
     }
 
+    function markCardSaved() {
+        var t = I18n.t;
+        var btn = document.getElementById('modal-save-card-btn');
+        if (!btn) return;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="ma-icon">&#10003;</span> ' + t('alreadySaved');
+    }
+
     async function saveCurrentCard(btn) {
         var t = I18n.t;
         if (!currentNode) return;
@@ -151,7 +176,7 @@ const ModalManager = (function () {
                 time: currentNode.time || '',
                 topic: currentTopic || ''
             });
-            btn.innerHTML = '<span class="ma-icon">&#10003;</span> ' + t('cardSaved');
+            markCardSaved();
             Toast.show(t('cardSaved'), 'success');
         } catch (err) {
             btn.disabled = false;
@@ -183,10 +208,10 @@ const ModalManager = (function () {
                     html += '<div class="quiz-q">';
                     html += '<div class="quiz-q-num">' + (i + 1) + '</div>';
                     html += '<div class="quiz-q-body">';
-                    html += '<div class="quiz-q-text">' + q.q + '</div>';
+                    html += '<div class="quiz-q-text">' + escapeHtml(q.q) + '</div>';
                     html += '<div class="quiz-opts">';
                     q.options.forEach(function (opt, j) {
-                        html += '<button class="quiz-opt" data-correct="' + (q.correct || 0) + '" data-idx="' + j + '">' + opt + '</button>';
+                        html += '<button class="quiz-opt" data-correct="' + (q.correct || 0) + '" data-idx="' + j + '">' + escapeHtml(opt) + '</button>';
                     });
                     html += '</div></div></div>';
                 });
@@ -194,7 +219,6 @@ const ModalManager = (function () {
             } else {
                 html = '<div class="modal-ai-text">' + formatText(result.data) + '</div>';
             }
-
             resultEl.innerHTML = html + '<div class="modal-ai-actions"><button class="modal-action-btn modal-save-btn" id="modal-save-text">' + (t('saveText') || 'Сохранить') + '</button><button class="modal-action-btn" id="modal-ai-close-btn">' + t('closeBtn') + '</button></div>';
             var closeBtn = document.getElementById('modal-ai-close-btn');
             if (closeBtn) closeBtn.addEventListener('click', function () { resultEl.innerHTML = ''; });
@@ -232,6 +256,8 @@ const ModalManager = (function () {
 
     function formatText(text) {
         if (!text) return '';
+        // сначала экранируем HTML из текста модели, потом превращаем markdown в разметку
+        text = escapeHtml(text);
         return text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')

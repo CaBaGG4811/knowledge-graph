@@ -96,6 +96,15 @@ const HomePage = (function () {
         startHints();
         loadSidebarHistory();
         startGhostAnimation();
+
+        // очистка при уходе со страницы (Router.runCleanups)
+        Router.addCleanup(function () {
+            stopGhostAnimation();
+            if (hintTimer) { clearInterval(hintTimer); hintTimer = null; }
+            _docClickHandlers.forEach(function (h) { document.removeEventListener('click', h); });
+            _docClickHandlers = [];
+            closeSearchModal();
+        });
     }
 
     function buildSuggestDropdown() {
@@ -389,7 +398,7 @@ const HomePage = (function () {
                     closeSearchModal();
                     ModalManager.setTopic(card.topic);
                     ModalManager.openModal(
-                        { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time },
+                        { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time, saved_card_id: card.id },
                         { nodes: [], edges: [] }
                     );
                 });
@@ -433,8 +442,11 @@ const HomePage = (function () {
                 return;
             }
             track.innerHTML = '';
-            data.cards.forEach(function (card) {
-                track.appendChild(buildLibraryTile(card, track));
+            data.cards.forEach(function (card, idx) {
+                var tile = buildLibraryTile(card, track);
+                tile.style.animation = 'item-in 0.3s ease backwards';
+                tile.style.animationDelay = (Math.min(idx, 10) * 0.06) + 's';
+                track.appendChild(tile);
             });
             requestAnimationFrame(updateLibraryNav);
         } catch (err) {
@@ -461,7 +473,7 @@ const HomePage = (function () {
         tile.addEventListener('click', function () {
             ModalManager.setTopic(card.topic);
             ModalManager.openModal(
-                { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time },
+                { id: 'lib-' + card.id, label: card.label, description: card.description, difficulty: card.difficulty, time: card.time, saved_card_id: card.id },
                 { nodes: [], edges: [] }
             );
         });
@@ -497,14 +509,16 @@ const HomePage = (function () {
                 return;
             }
             listEl.innerHTML = '';
-            data.trees.slice().reverse().forEach(function (tree) {
+            data.trees.slice().reverse().forEach(function (tree, idx) {
                 var item = document.createElement('button');
                 item.className = 'sidebar-item';
+                item.style.animation = 'item-in 0.28s ease backwards';
+                item.style.animationDelay = (Math.min(idx, 12) * 0.04) + 's';
                 var dateStr = tree.created_at ? new Date(tree.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
                 var iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
                 item.innerHTML = '<div class="sidebar-item-icon">' + iconSvg + '</div>' +
-                    '<div class="sidebar-item-info"><span class="sidebar-item-name">' + (tree.name || tree.topic || '—') + '</span>' +
-                    (dateStr ? '<span class="sidebar-item-date">' + dateStr + '</span>' : '') + '</div>';
+                    '<div class="sidebar-item-info"><span class="sidebar-item-name">' + escapeHtml(tree.name || tree.topic || '—') + '</span>' +
+                    (dateStr ? '<span class="sidebar-item-date">' + escapeHtml(dateStr) + '</span>' : '') + '</div>';
                 item.addEventListener('click', function () {
                     try {
                         var gd = typeof tree.graph_data === 'string' ? JSON.parse(tree.graph_data) : tree.graph_data;
@@ -745,6 +759,52 @@ const HomePage = (function () {
     }
 
     /* ============================================
+       Красивый ввод названия (вместо window.prompt)
+       ============================================ */
+
+    function askText(labelText) {
+        var t = I18n.t;
+        return new Promise(function (resolve) {
+            var overlay = document.createElement('div');
+            overlay.className = 'ask-overlay pending';
+            overlay.innerHTML =
+                '<div class="ask-backdrop"></div>' +
+                '<div class="ask-modal">' +
+                    '<div class="ask-title">' + escapeHtml(labelText) + '</div>' +
+                    '<input type="text" class="ask-input" maxlength="100" autocomplete="off">' +
+                    '<div class="ask-actions">' +
+                        '<button class="btn btn-sm" id="ask-cancel">' + escapeHtml(t('cancelBtn')) + '</button>' +
+                        '<button class="btn btn-primary btn-sm" id="ask-ok">' + escapeHtml(t('saveTreeTitle')) + '</button>' +
+                    '</div>' +
+                '</div>';
+            document.body.appendChild(overlay);
+            var input = overlay.querySelector('.ask-input');
+            var done = false;
+            function finish(value) {
+                if (done) return;
+                done = true;
+                overlay.classList.add('ask-closing');
+                setTimeout(function () { overlay.remove(); }, 160);
+                resolve(value);
+            }
+            overlay.querySelector('#ask-ok').addEventListener('click', function () {
+                var v = input.value.trim();
+                finish(v || null);
+            });
+            overlay.querySelector('#ask-cancel').addEventListener('click', function () { finish(null); });
+            overlay.querySelector('.ask-backdrop').addEventListener('click', function () { finish(null); });
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { var v = input.value.trim(); finish(v || null); }
+                if (e.key === 'Escape') finish(null);
+            });
+            requestAnimationFrame(function () {
+                overlay.classList.remove('pending');
+                input.focus();
+            });
+        });
+    }
+
+    /* ============================================
        Graph View
        ============================================ */
 
@@ -759,7 +819,7 @@ const HomePage = (function () {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                         ${t('graphBack')}
                     </button>
-                    <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${topic}</span>
+                    <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${escapeHtml(topic)}</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <button class="btn btn-sm" id="graph-save">
@@ -781,15 +841,15 @@ const HomePage = (function () {
             if (topbar) topbar.style.opacity = '0';
             setTimeout(function () { render(); }, 300);
         });
-        document.getElementById('graph-save').addEventListener('click', async function () {
-            var name = prompt(t('saveTreePrompt'));
-            if (!name) return;
-            try {
-                await API.post('/api/trees', { name: name, graph_data: graphData, topic: topic });
-                Toast.show(t('saveTreeSuccess'), 'success');
-            } catch (err) {
-                Toast.show(err.message, 'error');
-            }
+        document.getElementById('graph-save').addEventListener('click', function () {
+            askText(t('saveTreePrompt')).then(function (name) {
+                if (!name) return;
+                API.post('/api/trees', { name: name, graph_data: graphData, topic: topic }).then(function () {
+                    Toast.show(t('saveTreeSuccess'), 'success');
+                }).catch(function (err) {
+                    Toast.show(err.message, 'error');
+                });
+            });
         });
         document.getElementById('graph-settings-btn').addEventListener('click', function () {
             window.location.hash = '#/settings';

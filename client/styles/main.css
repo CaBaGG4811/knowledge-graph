@@ -870,6 +870,76 @@ body {
 /* ============================================
    Animations
    ============================================ */
+@keyframes item-in {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* каскад в модалке карточки */
+.modal-stagger { animation: block-in 0.25s ease backwards; }
+.modal-stagger:nth-child(1) { animation-delay: 0.05s; }
+.modal-stagger:nth-child(2) { animation-delay: 0.12s; }
+.modal-dual .modal-stagger:nth-child(1) { animation-delay: 0.19s; }
+.modal-dual .modal-stagger:nth-child(2) { animation-delay: 0.26s; }
+@keyframes block-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* кнопки — подъём и подсветка */
+.btn { will-change: transform; }
+.btn:not(:disabled):hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.35); }
+.btn:not(:disabled):hover.btn-primary { box-shadow: 0 3px 14px rgba(224,224,224,0.15); }
+.btn:not(:disabled):active { transform: translateY(0) scale(0.97); }
+.side-btn:not(:disabled):active { transform: scale(0.98); }
+.settings-option:not(:disabled):active { transform: scale(0.96); }
+.modal-action-btn:not(:disabled):active { transform: scale(0.97); }
+.modal-action-btn.saved-state { opacity: 0.45; cursor: default; }
+
+/* диалог сохранения названия */
+.ask-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    transition: opacity 0.16s ease;
+}
+.ask-overlay.pending, .ask-overlay.ask-closing { opacity: 0; }
+.ask-backdrop { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); }
+.ask-modal {
+    position: relative;
+    z-index: 1;
+    width: min(380px, calc(100vw - 48px));
+    background: #111111;
+    border: 1px solid #222222;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+    animation: search-in 0.18s ease;
+    transition: opacity 0.16s ease;
+}
+.ask-overlay.pending .ask-modal { transform: scale(0.95) translateY(8px); }
+.ask-modal { transition: transform 0.16s ease, opacity 0.16s ease; }
+.ask-overlay.pending .ask-modal, .ask-closing .ask-modal { transform: scale(0.95) translateY(8px); }
+.ask-title { font-size: calc(14px * var(--font-scale)); font-weight: 600; color: #e0e0e0; margin-bottom: 12px; }
+.ask-input {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid #222222;
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-size: calc(13px * var(--font-scale));
+    font-family: 'Fira Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.ask-input:focus { border-color: #444; }
+.ask-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
 .hint-fade-out { animation: hint-out 0.3s ease forwards; }
 .hint-fade-in { animation: hint-in 0.4s ease forwards; }
 @keyframes hint-out { 0% { opacity: 1; } 100% { opacity: 0; } }

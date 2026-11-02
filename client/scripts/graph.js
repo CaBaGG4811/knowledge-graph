@@ -26,6 +26,9 @@ const GraphRenderer = (function () {
     }
 
     var currentEdgesProcessed = [];
+    var currentGraphData = null;
+    var currentTopicName = '';
+    var resizeTimer = null;
 
     function truncateText(text, maxLen) {
         if (!text) return '';
@@ -203,6 +206,8 @@ const GraphRenderer = (function () {
         if (!container) return;
         container.innerHTML = '';
         currentEdgesProcessed = [];
+        currentGraphData = graphData;
+        currentTopicName = topicName;
         if (typeof ModalManager !== 'undefined' && ModalManager.setTopic) ModalManager.setTopic(topicName);
 
         var width = window.innerWidth;
@@ -486,6 +491,15 @@ window._graphHighlight = function (nodeId) {
             highlightConnections(nodeId, nodesFlat);
         };
     }
+
+    // перерисовка графа при ресайзе окна (один слушатель на модуль)
+    window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+            if (!document.getElementById('graph-container')) return;
+            if (currentGraphData) renderGraph(currentGraphData, currentTopicName);
+        }, 250);
+    });
 
     return { renderGraph: renderGraph };
 })();

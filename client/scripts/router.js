@@ -1,4 +1,4 @@
-/* router.js — hash-роутинг с анимацией */
+/* router.js — hash-роутинг с анимацией и очисткой страниц */
 const Router = (function () {
     'use strict';
 
@@ -7,6 +7,16 @@ const Router = (function () {
 
     function register(path, handler) {
         routes[path] = handler;
+    }
+
+    // страницы регистрируют очистщики (таймеры, слушатели документа) через Router.addCleanup
+    var cleanups = [];
+    function addCleanup(fn) { if (typeof fn === 'function') cleanups.push(fn); }
+    function runCleanups() {
+        while (cleanups.length) {
+            var fn = cleanups.pop();
+            try { fn(); } catch (e) {}
+        }
     }
 
     function navigate() {
@@ -37,6 +47,7 @@ const Router = (function () {
     }
 
     function renderPage(path, content) {
+        runCleanups();
         var handler = routes[path];
         if (handler) {
             handler();
@@ -54,5 +65,5 @@ const Router = (function () {
         navigate();
     }
 
-    return { register: register, init: init, navigate: navigate };
+    return { register: register, init: init, navigate: navigate, addCleanup: addCleanup };
 })();

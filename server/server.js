@@ -27,7 +27,7 @@ app.use('/api/generate', generateRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/cards', cardsRoutes);
 
-app.get('*', (req, res) => {
+app.get('/{*any}', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'index.html'));
 });
 

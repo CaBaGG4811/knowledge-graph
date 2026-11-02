@@ -19,8 +19,13 @@ const API = (function () {
         }
         try {
             var response = await fetch(url, options);
-            var data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Ошибка сервера');
+            var data = null;
+            try { data = await response.json(); }
+            catch (parseError) { data = null; }
+            if (!response.ok) {
+                var message = (data && data.error) ? data.error : 'Ошибка сервера (' + response.status + ')';
+                throw new Error(message);
+            }
             return data;
         } finally {
             if (timer) clearTimeout(timer);
