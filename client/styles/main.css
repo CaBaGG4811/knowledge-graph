@@ -66,6 +66,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    line-height: 1.25;
     transition: all 0.15s;
     text-decoration: none;
 }
@@ -81,7 +82,7 @@ body {
 .btn-primary:hover { background: #ffffff; border-color: #ffffff; }
 .btn-danger { color: #ef4444; }
 .btn-danger:hover { background: rgba(239, 68, 68, 0.1); border-color: #ef4444; }
-.btn-sm { padding: 5px 10px; font-size: calc(11px * var(--font-scale)); }
+.btn-sm { padding: 6px 12px; font-size: calc(11px * var(--font-scale)); }
 
 /* ============================================
    Input
@@ -715,16 +716,19 @@ body {
     border-radius: 8px;
     padding: 16px;
 }
-.settings-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a1a1a; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #1a1a1a; }
 .settings-row:last-child { border-bottom: none; }
-.settings-label { font-size: calc(12px * var(--font-scale)); color: #888; }
-.settings-control { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.settings-label { font-size: calc(12px * var(--font-scale)); color: #888; flex-shrink: 0; }
+.settings-control { display: flex; gap: 8px; row-gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .settings-option {
     background: #111111;
     border: 1px solid #1a1a1a;
     border-radius: 6px;
-    padding: 5px 12px;
+    padding: calc(6px * var(--font-scale)) calc(13px * var(--font-scale));
     font-size: calc(11px * var(--font-scale));
+    line-height: 1.3;
+    white-space: nowrap;
+    flex-shrink: 0;
     font-family: 'Fira Sans', sans-serif;
     color: #666;
     cursor: pointer;
@@ -758,7 +762,7 @@ body {
 .settings-input:focus { border-color: #444; }
 .settings-input::placeholder { color: #444; }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
     .settings-row { flex-direction: column; align-items: stretch; gap: 8px; }
     .settings-control { justify-content: flex-start; }
 }
