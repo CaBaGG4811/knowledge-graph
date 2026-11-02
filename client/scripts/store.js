@@ -3,7 +3,7 @@ const Store = (function () {
     'use strict';
 
     var state = {
-        settings: { theme: 'dark', accentColor: '#e0e0e0', fontSize: 'medium', lang: 'ru', llmUrl: '', llmModel: '' }
+        settings: { theme: 'dark', accentColor: '#e0e0e0', fontSize: 'medium', lang: 'ru', llmUrl: '', llmModel: '', activeProviderId: null }
     };
 
     function get(key) { return key ? state[key] : state; }

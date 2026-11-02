@@ -1,21 +1,9 @@
 const express = require('express');
 const http = require('http');
 const https = require('https');
-const { getOne } = require('../db');
+const { callLlm, getLlmConfig, pingProvider } = require('../llm');
 
 const router = express.Router();
-
-const DEFAULT_LLM_URL = process.env.LLM_URL || 'http://172.25.64.1:1234/v1/chat/completions';
-const DEFAULT_LLM_MODEL = process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
-
-function getLlmConfig() {
-    var url = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_url']) || {}).value || '';
-    var model = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_model']) || {}).value || '';
-    return {
-        url: url || DEFAULT_LLM_URL,
-        model: model || DEFAULT_LLM_MODEL
-    };
-}
 
 /* ============================================
    Web Search — DuckDuckGo HTML
@@ -186,34 +174,6 @@ function tryRepairJson(text) {
     } catch (_) { return null; }
 }
 
-function llmFetch(url, body, extraHeaders, timeoutMs) {
-    return new Promise((resolve, reject) => {
-        const parsed = new URL(url);
-        const isHttps = parsed.protocol === 'https:';
-        const lib = isHttps ? https : http;
-        const data = JSON.stringify(body);
-        const headers = { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) };
-        if (extraHeaders) Object.assign(headers, extraHeaders);
-        const req = lib.request({
-            hostname: parsed.hostname,
-            port: parsed.port,
-            path: parsed.pathname + (parsed.search || ''),
-            method: 'POST',
-            headers,
-            timeout: timeoutMs || 600000,
-            agent: isHttps ? https.globalAgent : http.globalAgent
-        }, (res) => {
-            let chunks = [];
-            res.on('data', (c) => chunks.push(c));
-            res.on('end', () => resolve({ status: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 300, json: () => Promise.resolve(JSON.parse(Buffer.concat(chunks).toString())), text: () => Promise.resolve(Buffer.concat(chunks).toString()) }));
-        });
-        req.setTimeout(timeoutMs || 600000, () => { req.destroy(); reject(new Error('LLM timeout')); });
-        req.on('error', reject);
-        req.write(data);
-        req.end();
-    });
-}
-
 // убираем markdown, LaTeX и мусор из текста
 function cleanText(text) {
     if (!text) return '';
@@ -281,30 +241,15 @@ ${searchContext}
 - 12-15 узлов минимум`;
 
     try {
-        var llmCfg = getLlmConfig();
-        const llmResponse = await llmFetch(llmCfg.url, {
-            model: llmCfg.model,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt }
-            ],
+        var llmResult = await callLlm({
+            system: systemPrompt,
+            user: userPrompt,
             temperature: 0.3,
-            max_tokens: 8192
+            maxTokens: 8192,
+            timeout: 600000
         });
-
-        if (!llmResponse.ok) {
-            const errorText = await llmResponse.text();
-            console.error('[LLM]', llmResponse.status, errorText);
-            return res.status(502).json({ error: `LM Studio: ${llmResponse.status}` });
-        }
-
-        const llmData = await llmResponse.json();
-        const msg = llmData.choices?.[0]?.message;
-        const rawContent = (msg?.content || msg?.reasoning_content || '').toString();
-        const hasReasoning = !!(msg?.reasoning_content);
-        const hasContent = !!(msg?.content);
-        console.log('[LLM] content length:', (msg?.content || '').length, '| reasoning length:', (msg?.reasoning_content || '').length);
-        if (hasReasoning) console.log('[LLM] reasoning preview:', rawContent.substring(0, 300));
+        const rawContent = llmResult.text;
+        console.log('[LLM]', llmResult.cfg.name, '| model:', llmResult.cfg.model, '| length:', rawContent.length);
         const cleaned = rawContent.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
 
         let parsed;
@@ -351,8 +296,8 @@ ${searchContext}
         res.json(parsed);
 
     } catch (networkError) {
-        console.error('[Сеть]', networkError.message);
-        res.status(502).json({ error: 'LLM недоступен.' });
+        console.error('[LLM]', networkError.message);
+        res.status(502).json({ error: networkError.message || 'LLM недоступен.' });
     }
 });
 
@@ -375,21 +320,13 @@ router.post('/action', async (req, res) => {
     if (!prompt) return res.status(400).json({ error: 'Неизвестное действие' });
 
     try {
-        var llmCfg = getLlmConfig();
-        const llmResponse = await llmFetch(llmCfg.url, {
-            model: llmCfg.model,
-            messages: [
-                { role: 'system', content: 'Пиши кратко и по делу. Без воды, без roleplay, без «как преподавателя».' },
-                { role: 'user', content: prompt }
-            ],
+        var llmResult = await callLlm({
+            system: 'Пиши кратко и по делу. Без воды, без roleplay, без «как преподавателя».',
+            user: prompt,
             temperature: 0.4,
-            max_tokens: 4096
+            maxTokens: 4096
         });
-
-        if (!llmResponse.ok) return res.status(502).json({ error: 'LLM недоступен' });
-
-        const llmData = await llmResponse.json();
-        var rawContent = (llmData.choices?.[0]?.message?.content || llmData.choices?.[0]?.message?.reasoning_content || '').toString();
+        var rawContent = llmResult.text;
 
         if (action === 'quiz') {
             try {
@@ -428,11 +365,8 @@ router.post('/action', async (req, res) => {
 router.get('/ping', async function (req, res) {
     try {
         var cfg = getLlmConfig();
-        var modelsUrl;
-        try { modelsUrl = new URL(cfg.url).origin + '/v1/models'; }
-        catch (e) { return res.json({ ok: false, error: 'bad llm url' }); }
-        await fetchUrl(modelsUrl, 6000);
-        res.json({ ok: true, model: cfg.model, url: cfg.url });
+        var ping = await pingProvider(cfg);
+        res.json({ ok: !!ping.ok, model: cfg.model, provider: cfg.name, error: ping.error || null });
     } catch (e) {
         res.json({ ok: false, error: e.message });
     }
@@ -453,20 +387,14 @@ router.post('/check', async function (req, res) {
         if (low.indexOf(CHECK_STEMS[i]) !== -1) return res.json({ ok: false, code: 'profanity' });
     }
     try {
-        var cfg = getLlmConfig();
-        var resp = await llmFetch(cfg.url, {
-            model: cfg.model,
-            messages: [
-                { role: 'system', content: CHECK_SYSTEM },
-                { role: 'user', content: CHECK_USER_PREFIX + topic + CHECK_USER_SUFFIX }
-            ],
+        var llmResult = await callLlm({
+            system: CHECK_SYSTEM,
+            user: CHECK_USER_PREFIX + topic + CHECK_USER_SUFFIX,
             temperature: 0.0,
-            max_tokens: 1500
-        }, null, 60000);
-        if (!resp.ok) return res.json({ ok: false, code: 'connection' });
-        var data = await resp.json();
-        var msg0 = (data.choices && data.choices[0] && data.choices[0].message) || {};
-        var raw = ((msg0.content || msg0.reasoning_content) || '').toString();
+            maxTokens: 1500,
+            timeout: 60000
+        });
+        var raw = llmResult.text;
         var verdict = null;
         var m = raw.match(/\{[^{}]*"valid"[^{}]*\}/);
         if (m) { try { verdict = JSON.parse(m[0]); } catch (e) { verdict = null; } }

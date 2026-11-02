@@ -49,6 +49,22 @@ function ensureInit() {
                 )
             `);
 
+            // провайдеры ИИ (локальные и облачные)
+            db.run(`
+                CREATE TABLE IF NOT EXISTS providers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    base_url TEXT NOT NULL,
+                    api_key TEXT,
+                    model TEXT,
+                    api_format TEXT DEFAULT 'openai',
+                    auth_type TEXT DEFAULT 'bearer',
+                    extra_headers TEXT,
+                    preset_id TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             // дефолтные настройки
             var defaults = {
                 theme: 'dark',
@@ -56,7 +72,8 @@ function ensureInit() {
                 font_size: 'medium',
                 lang: 'ru',
                 llm_url: '',
-                llm_model: ''
+                llm_model: '',
+                active_provider_id: ''
             };
             Object.keys(defaults).forEach(function (k) {
                 var exists = getOne('SELECT id FROM settings WHERE key = ?', [k]);
@@ -65,6 +82,8 @@ function ensureInit() {
                 }
             });
 
+            migrateLegacyProvider();
+
             saveToDisk();
             console.log('  База данных инициализирована');
         })();
@@ -72,8 +91,37 @@ function ensureInit() {
     return initPromise;
 }
 
-function saveToDisk() {
-    if (!db) return;
+/* Переносит старые настройки llm_url/llm_model в таблицу провайдеров,
+   чтобы пользователь увидел свою локальную модель в новом интерфейсе. */
+function migrateLegacyProvider() {
+    try {
+        var count = getOne('SELECT COUNT(*) AS c FROM providers');
+        if (count && count.c > 0) return;
+
+        var activeRow = getOne("SELECT value FROM settings WHERE key = 'active_provider_id'");
+        if (activeRow && activeRow.value) return;
+
+        var urlRow = getOne("SELECT value FROM settings WHERE key = 'llm_url'");
+        var legacyUrl = urlRow && urlRow.value ? String(urlRow.value) : '';
+        if (!legacyUrl) return;
+
+        var modelRow = getOne("SELECT value FROM settings WHERE key = 'llm_model'");
+        var legacyModel = modelRow && modelRow.value ? String(modelRow.value) : '';
+
+        runQuery(
+            'INSERT INTO providers (name, base_url, api_key, model, api_format, auth_type, preset_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            ['Текущая модель', legacyUrl, '', legacyModel, 'openai', 'bearer', 'custom']
+        );
+        var created = getOne('SELECT id FROM providers ORDER BY id DESC LIMIT 1');
+        if (created) {
+            runQuery('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['active_provider_id', String(created.id)]);
+        }
+    } catch (e) {
+        console.error('[DB] migrate providers:', e.message);
+    }
+}
+
+function saveToDisk() {    if (!db) return;
     if (saveTimeout) clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
         try {

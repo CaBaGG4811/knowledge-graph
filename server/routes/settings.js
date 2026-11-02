@@ -10,7 +10,8 @@ router.get('/', (req, res) => {
     var lang = (getOne('SELECT value FROM settings WHERE key = ?', ['lang']) || {}).value || 'ru';
     var llmUrl = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_url']) || {}).value || '';
     var llmModel = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_model']) || {}).value || '';
-    res.json({ theme, accentColor, fontSize, lang, llmUrl, llmModel });
+    var activeProviderId = Number((getOne('SELECT value FROM settings WHERE key = ?', ['active_provider_id']) || {}).value) || null;
+    res.json({ theme, accentColor, fontSize, lang, llmUrl, llmModel, activeProviderId });
 });
 
 router.put('/', (req, res) => {
@@ -41,7 +42,8 @@ router.put('/', (req, res) => {
     var langVal = (getOne('SELECT value FROM settings WHERE key = ?', ['lang']) || {}).value || 'ru';
     var llmUrlVal = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_url']) || {}).value || '';
     var llmModelVal = (getOne('SELECT value FROM settings WHERE key = ?', ['llm_model']) || {}).value || '';
-    res.json({ theme: themeVal, accentColor: accentVal, fontSize: fontVal, lang: langVal, llmUrl: llmUrlVal, llmModel: llmModelVal });
+    var activeProviderIdVal = Number((getOne('SELECT value FROM settings WHERE key = ?', ['active_provider_id']) || {}).value) || null;
+    res.json({ theme: themeVal, accentColor: accentVal, fontSize: fontVal, lang: langVal, llmUrl: llmUrlVal, llmModel: llmModelVal, activeProviderId: activeProviderIdVal });
 });
 
 module.exports = router;

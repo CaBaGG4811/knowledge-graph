@@ -21,17 +21,9 @@ const SettingsPage = (function () {
                 <h1 class="settings-title">${t('settingsTitle')}</h1>
 
                 <div class="settings-section">
-                    <div class="settings-section-title">LLM</div>
-                    <div class="settings-group">
-                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-                            <span class="settings-label">${t('settingLlmUrl') || 'URL сервера'}</span>
-                            <input type="text" class="settings-input" id="settings-llm-url" placeholder="http://172.29.192.1:1234/v1/chat/completions" value="${s.llmUrl || ''}">
-                        </div>
-                        <div class="settings-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-                            <span class="settings-label">${t('settingLlmModel') || 'Модель'}</span>
-                            <input type="text" class="settings-input" id="settings-llm-model" placeholder="google/gemma-4-12b-qat" value="${s.llmModel || ''}">
-                        </div>
-                    </div>
+                    <div class="settings-section-title">${t('llmSectionTitle')}</div>
+                    <div class="settings-section-subtitle">${t('llmSectionSubtitle')}</div>
+                    <div id="llm-provider-root"></div>
                 </div>
 
                 <div class="settings-section">
@@ -58,11 +50,14 @@ const SettingsPage = (function () {
             </div>
         `;
         bindEvents();
+
+        var providerRoot = document.getElementById('llm-provider-root');
+        if (providerRoot && typeof SettingsProvider !== 'undefined') {
+            SettingsProvider.mount(providerRoot);
+        }
     }
 
     function bindEvents() {
-        var debounceTimer = null;
-
         function saveSetting(key, value) {
             var s = Store.get('settings');
             s[key] = value;
@@ -104,22 +99,6 @@ const SettingsPage = (function () {
                 saveSetting('accentColor', color);
             });
         });
-
-        var urlInput = document.getElementById('settings-llm-url');
-        var modelInput = document.getElementById('settings-llm-model');
-
-        if (urlInput) {
-            urlInput.addEventListener('input', function () {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(function () { saveSetting('llmUrl', urlInput.value); }, 500);
-            });
-        }
-        if (modelInput) {
-            modelInput.addEventListener('input', function () {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(function () { saveSetting('llmModel', modelInput.value); }, 500);
-            });
-        }
     }
 
     return { render: render };
