@@ -1,7 +1,7 @@
 {
   "name": "knowledge-graph-server",
   "version": "3.0.0",
-  "description": "Карта знаний — без авторизации",
+  "description": "Local knowledge graph builder with pluggable AI providers",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

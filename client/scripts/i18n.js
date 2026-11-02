@@ -103,6 +103,8 @@ const I18n = (function () {
             settingTheme: 'Тема',
             themeDark: 'Тёмная',
             themeLight: 'Светлая',
+            themeMidnight: 'Ночная',
+            themeSand: 'Песочная',
             settingAccent: 'Акцентный цвет',
             settingFontSize: 'Размер шрифта',
             fontSmall: 'Маленький',
@@ -121,10 +123,10 @@ const I18n = (function () {
             unknownAction: 'Неизвестное действие',
             llmUnavailable: 'LLM недоступен',
 
-            // Провайдеры ИИ
-            llmSectionTitle: 'Подключение ИИ',
-            llmSectionSubtitle: 'Локальная модель или любой облачный провайдер',
-            provPresets: 'Провайдеры',
+            // Провайдеры ИИ            provPresets: 'Провайдеры',
+            provAll: 'Все провайдеры',
+            provCollapse: 'Свернуть',
+            provPick: 'Выберите провайдера, чтобы настроить подключение',
             provSaved: 'Мои подключения',
             provCustom: 'Свой провайдер',
             provLocal: 'локально',
@@ -255,6 +257,8 @@ const I18n = (function () {
             settingTheme: 'Theme',
             themeDark: 'Dark',
             themeLight: 'Light',
+            themeMidnight: 'Midnight',
+            themeSand: 'Sand',
             settingAccent: 'Accent color',
             settingFontSize: 'Font size',
             fontSmall: 'Small',
@@ -272,10 +276,10 @@ const I18n = (function () {
             unknownAction: 'Unknown action',
             llmUnavailable: 'LLM unavailable',
 
-            // AI providers
-            llmSectionTitle: 'AI connection',
-            llmSectionSubtitle: 'A local model or any cloud provider',
-            provPresets: 'Providers',
+            // AI providers            provPresets: 'Providers',
+            provAll: 'All providers',
+            provCollapse: 'Collapse',
+            provPick: 'Select a provider to configure a connection',
             provSaved: 'My connections',
             provCustom: 'Custom provider',
             provLocal: 'local',
@@ -406,6 +410,8 @@ const I18n = (function () {
             settingTheme: '主题',
             themeDark: '深色',
             themeLight: '浅色',
+            themeMidnight: '午夜',
+            themeSand: '沙色',
             settingAccent: '强调色',
             settingFontSize: '字体大小',
             fontSmall: '小',
@@ -423,10 +429,10 @@ const I18n = (function () {
             unknownAction: '未知操作',
             llmUnavailable: 'LLM 不可用',
 
-            // AI 服务商
-            llmSectionTitle: 'AI 连接',
-            llmSectionSubtitle: '本地模型或任意云服务商',
-            provPresets: '服务商',
+            // AI 服务商            provPresets: '服务商',
+            provAll: '全部服务商',
+            provCollapse: '收起',
+            provPick: '选择一个服务商以配置连接',
             provSaved: '我的连接',
             provCustom: '自定义服务商',
             provLocal: '本地',
@@ -557,6 +563,8 @@ const I18n = (function () {
             settingTheme: 'Tema',
             themeDark: 'Oscuro',
             themeLight: 'Claro',
+            themeMidnight: 'Medianoche',
+            themeSand: 'Arena',
             settingAccent: 'Color de acento',
             settingFontSize: 'Tamaño de fuente',
             fontSmall: 'Pequeño',
@@ -574,10 +582,10 @@ const I18n = (function () {
             unknownAction: 'Acción desconocida',
             llmUnavailable: 'LLM no disponible',
 
-            // Proveedores de IA
-            llmSectionTitle: 'Conexión de IA',
-            llmSectionSubtitle: 'Modelo local o cualquier proveedor en la nube',
-            provPresets: 'Proveedores',
+            // Proveedores de IA            provPresets: 'Proveedores',
+            provAll: 'Todos los proveedores',
+            provCollapse: 'Contraer',
+            provPick: 'Selecciona un proveedor para configurar la conexión',
             provSaved: 'Mis conexiones',
             provCustom: 'Proveedor personalizado',
             provLocal: 'local',
@@ -708,6 +716,8 @@ const I18n = (function () {
             settingTheme: 'थीम',
             themeDark: 'डार्क',
             themeLight: 'लाइट',
+            themeMidnight: 'मिडनाइट',
+            themeSand: 'सैंड',
             settingAccent: 'एक्सेंट कलर',
             settingFontSize: 'फ़ॉन्ट आकार',
             fontSmall: 'छोटा',
@@ -725,10 +735,10 @@ const I18n = (function () {
             unknownAction: 'अज्ञात क्रिया',
             llmUnavailable: 'LLM उपलब्ध नहीं',
 
-            // AI प्रोवाइडर
-            llmSectionTitle: 'AI कनेक्शन',
-            llmSectionSubtitle: 'लोकल मॉडल या कोई भी क्लाउड प्रोवाइडर',
-            provPresets: 'प्रोवाइडर',
+            // AI प्रोवाइडर            provPresets: 'प्रोवाइडर',
+            provAll: 'सभी प्रोवाइडर',
+            provCollapse: 'समेटें',
+            provPick: 'कनेक्शन सेट करने के लिए प्रोवाइडर चुनें',
             provSaved: 'मेरे कनेक्शन',
             provCustom: 'अपना प्रोवाइडर',
             provLocal: 'लोकल',
@@ -859,6 +869,8 @@ const I18n = (function () {
             settingTheme: 'السمة',
             themeDark: 'داكن',
             themeLight: 'فاتح',
+            themeMidnight: 'ليلي',
+            themeSand: 'رملي',
             settingAccent: 'لون التمييز',
             settingFontSize: 'حجم الخط',
             fontSmall: 'صغير',
@@ -876,10 +888,10 @@ const I18n = (function () {
             unknownAction: 'إجراء غير معروف',
             llmUnavailable: 'LLM غير متاح',
 
-            // مزوّدو الذكاء الاصطناعي
-            llmSectionTitle: 'اتصال الذكاء الاصطناعي',
-            llmSectionSubtitle: 'نموذج محلي أو أي مزوّد سحابي',
-            provPresets: 'المزوّدون',
+            // مزوّدو الذكاء الاصطناعي            provPresets: 'المزوّدون',
+            provAll: 'جميع المزوّدين',
+            provCollapse: 'طي',
+            provPick: 'اختر مزوّدًا لإعداد الاتصال',
             provSaved: 'اتصالاتي',
             provCustom: 'مزوّد مخصص',
             provLocal: 'محلي',

@@ -2,7 +2,20 @@
 const SettingsPage = (function () {
     'use strict';
 
-    var accentColors = ['#e0e0e0', '#22c55e', '#3b82f6', '#eab308', '#ef4444', '#a855f7', '#ec4899', '#06b6d4'];
+    var themes = [
+        { id: 'dark', label: 'themeDark' },
+        { id: 'light', label: 'themeLight' },
+        { id: 'midnight', label: 'themeMidnight' },
+        { id: 'sand', label: 'themeSand' }
+    ];
+
+    function themeButtons(current) {
+        return themes.map(function (theme) {
+            return '<button class="settings-option theme-option ' + (current === theme.id ? 'active' : '') + '" data-setting="theme" data-value="' + theme.id + '">' +
+                '<span class="theme-dot theme-dot-' + theme.id + '"></span>' + I18n.t(theme.label) +
+            '</button>';
+        }).join('');
+    }
 
     function render() {
         document.body.style.overflow = 'auto';
@@ -21,14 +34,17 @@ const SettingsPage = (function () {
                 <h1 class="settings-title">${t('settingsTitle')}</h1>
 
                 <div class="settings-section">
-                    <div class="settings-section-title">${t('llmSectionTitle')}</div>
-                    <div class="settings-section-subtitle">${t('llmSectionSubtitle')}</div>
+                    <div class="settings-section-title">${t('provPresets')}</div>
                     <div id="llm-provider-root"></div>
                 </div>
 
                 <div class="settings-section">
                     <div class="settings-section-title">${t('sectionAppearance')}</div>
                     <div class="settings-group">
+                        <div class="settings-row">
+                            <span class="settings-label">${t('settingTheme')}</span>
+                            <div class="settings-control">${themeButtons(s.theme)}</div>
+                        </div>
                         <div class="settings-row">
                             <span class="settings-label">${t('settingFontSize')}</span>
                             <div class="settings-control">
@@ -87,18 +103,6 @@ const SettingsPage = (function () {
             });
         });
 
-        document.querySelectorAll('.color-swatch').forEach(function (swatch) {
-            swatch.addEventListener('click', function () {
-                var color = swatch.getAttribute('data-color');
-                var s = Store.get('settings');
-                s.accentColor = color;
-                Store.set('settings', s);
-                document.querySelectorAll('.color-swatch').forEach(function (w) {
-                    w.classList.toggle('active', w === swatch);
-                });
-                saveSetting('accentColor', color);
-            });
-        });
     }
 
     return { render: render };

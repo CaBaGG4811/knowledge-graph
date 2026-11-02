@@ -5,7 +5,4 @@ server/.env
 *.log
 .DS_Store
 Thumbs.db
-error.log
-start.bat
-test_search.js
-package-lock.json
+/package-lock.json

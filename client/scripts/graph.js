@@ -215,13 +215,19 @@ const GraphRenderer = (function () {
 
         var svg = d3.select('#graph-container').append('svg').attr('width', width).attr('height', height);
 
-        var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        var isDark = theme !== 'light' && theme !== 'sand';
+        var rootStyles = getComputedStyle(document.documentElement);
+        function cssVar(name, fallback) {
+            var value = rootStyles.getPropertyValue(name).trim();
+            return value || fallback;
+        }
 
         var defs = svg.append('defs');
 
         var bgGrad = defs.append('radialGradient').attr('id', 'vignette-bg').attr('cx', '50%').attr('cy', '55%').attr('r', '55%');
-        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', isDark ? '#0a0a0a' : '#f5f5f5');
-        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', isDark ? '#000000' : '#e0e0e0');
+        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', cssVar('--c-panel', '#0a0a0a'));
+        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', cssVar('--c-bg', '#000000'));
         svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#vignette-bg)');
 
         // мягкая тень под карточками
@@ -234,19 +240,11 @@ const GraphRenderer = (function () {
             g.append('stop').attr('offset', '0%').attr('stop-color', c1);
             g.append('stop').attr('offset', '100%').attr('stop-color', c2);
         }
-        if (isDark) {
-            addGrad('card-gradient-root', '#1c1c1c', '#101010');
-            addGrad('card-gradient-l1', '#141414', '#0e0e0e');
-            addGrad('card-gradient-l2', '#131313', '#0d0d0d');
-            addGrad('card-gradient-l3', '#121212', '#0c0c0c');
-            addGrad('card-gradient-l4', '#111111', '#0b0b0b');
-        } else {
-            addGrad('card-gradient-root', '#ffffff', '#f2f2f2');
-            addGrad('card-gradient-l1', '#ffffff', '#f0f0f0');
-            addGrad('card-gradient-l2', '#ffffff', '#eeeeee');
-            addGrad('card-gradient-l3', '#f8f8f8', '#eeeeee');
-            addGrad('card-gradient-l4', '#f5f5f5', '#eeeeee');
-        }
+        addGrad('card-gradient-root', cssVar('--c-subtle', '#1c1c1c'), cssVar('--c-card', '#101010'));
+        addGrad('card-gradient-l1', cssVar('--c-card', '#141414'), cssVar('--c-panel', '#0e0e0e'));
+        addGrad('card-gradient-l2', cssVar('--c-card', '#131313'), cssVar('--c-panel', '#0d0d0d'));
+        addGrad('card-gradient-l3', cssVar('--c-card', '#121212'), cssVar('--c-panel', '#0c0c0c'));
+        addGrad('card-gradient-l4', cssVar('--c-card', '#111111'), cssVar('--c-panel', '#0b0b0b'));
 
         var graphGroup = svg.append('g').attr('class', 'graph-root');
         var zoomBehavior = d3.zoom().scaleExtent([0.15, 4]).on('zoom', function (e) { graphGroup.attr('transform', e.transform); });
@@ -321,7 +319,7 @@ const GraphRenderer = (function () {
 
         var linkElements = linkGroup.selectAll('path').data(edgesProcessed).enter()
             .append('path').attr('class', 'graph-link')
-            .attr('stroke', isDark ? '#4a4a4a' : '#c0c0c0')
+            .attr('stroke', cssVar('--c-strong', '#4a4a4a'))
             .attr('stroke-width', function (d) { return d.source.depth === 0 ? 2 : 1.25; })
             .attr('stroke-opacity', 0)
             .attr('d', function (d) { return curvePath(d.source, d.target); });
@@ -341,8 +339,7 @@ const GraphRenderer = (function () {
             .attr('rx', 12).attr('ry', 12)
             .attr('fill', function (d) { return 'url(#card-gradient-' + (d.depth === 0 ? 'root' : 'l' + Math.min(d.depth, 4)) + ')'; })
             .attr('stroke', function (d) {
-                if (isDark) return d.depth === 0 ? '#5f5f5f' : '#2e2e2e';
-                return d.depth === 0 ? '#b8b8b8' : '#d6d6d6';
+                return d.depth === 0 ? cssVar('--c-secondary-strong', '#5f5f5f') : cssVar('--c-border', '#2e2e2e');
             })
             .attr('stroke-width', function (d) { return d.depth === 0 ? 1.5 : 1; })
             .attr('filter', 'url(#card-shadow)');
@@ -370,7 +367,7 @@ const GraphRenderer = (function () {
                     .attr('x', 0)
                     .attr('y', titleStartY + i * 17)
                     .attr('font-size', ((isRoot ? 14 : 12.5) * fs).toFixed(2) + 'px')
-                    .attr('fill', isDark ? '#ececec' : '#1a1a1a');
+                    .attr('fill', cssVar('--c-text', '#ececec'));
             });
 
             // описание — одна строка, ниже заголовка
@@ -382,7 +379,7 @@ const GraphRenderer = (function () {
                     .attr('x', 0)
                     .attr('y', descY)
                     .attr('font-size', (10 * fs).toFixed(2) + 'px')
-                    .attr('fill', isDark ? '#8f8f8f' : '#666666');
+                    .attr('fill', cssVar('--c-secondary', '#8f8f8f'));
             }
 
             // сложность — точки слева снизу
@@ -394,7 +391,7 @@ const GraphRenderer = (function () {
                     .attr('cx', startX + i * 9)
                     .attr('cy', footY)
                     .attr('r', 2.5)
-                    .attr('fill', i < diff ? difficultyColor(diff) : (isDark ? '#262626' : '#dcdcdc'));
+                    .attr('fill', i < diff ? difficultyColor(diff) : cssVar('--c-subtle', '#262626'));
             }
 
             // время — справа снизу
@@ -405,7 +402,7 @@ const GraphRenderer = (function () {
                     .attr('x', d.cardWidth / 2 - 14)
                     .attr('y', footY + 3.5)
                     .attr('font-size', (9 * fs).toFixed(2) + 'px')
-                    .attr('fill', isDark ? '#787878' : '#888888');
+                    .attr('fill', cssVar('--c-muted', '#787878'));
             }
         });
 

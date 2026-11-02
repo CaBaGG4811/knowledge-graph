@@ -2,11 +2,14 @@
 const SettingsProvider = (function () {
     'use strict';
 
+    var FEATURED = ['openai', 'anthropic', 'gemini'];
+
     var root = null;
     var data = { presets: [], providers: [], activeId: null };
     var form = null;
     var testModels = null;
     var busy = null;
+    var expanded = false;
     var deleteArmed = null;
     var deleteTimer = null;
 
@@ -112,17 +115,33 @@ const SettingsProvider = (function () {
 
     function render() {
         if (!root) return;
+        var showForm = !!form.id || (!!form.presetId && form.presetId !== '');
         root.innerHTML =
-            '<div class="settings-section-title">' + esc(t('provPresets')) + '</div>' +
             '<div class="provider-grid">' + presetTiles() + '</div>' +
+            moreButton() +
             savedList() +
-            '<div class="provider-form">' + formFields() + '</div>' +
-            '<div class="provider-hint">' + esc(t('provHint')) + '</div>';
+            (showForm
+                ? '<div class="provider-form">' + formFields() + '</div>' +
+                  '<div class="provider-hint">' + esc(t('provHint')) + '</div>'
+                : '<div class="provider-empty">' + esc(t('provPick')) + '</div>');
         bind();
     }
 
+    function moreButton() {
+        if (data.presets.length <= FEATURED.length) return '';
+        return '<button type="button" class="provider-more" id="prov-more-btn" aria-expanded="' + (expanded ? 'true' : 'false') + '">' +
+            '<span>' + esc(expanded ? t('provCollapse') : t('provAll')) + '</span>' +
+            '<span class="provider-more-count">' + data.presets.length + '</span>' +
+            '<svg class="provider-more-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '</button>';
+    }
+
     function presetTiles() {
-        var html = data.presets.map(function (p) {
+        var list = expanded
+            ? data.presets
+            : data.presets.filter(function (p) { return FEATURED.indexOf(p.id) !== -1; });
+
+        var html = list.map(function (p) {
             var selected = form.presetId === p.id;
             return '<button type="button" class="provider-tile' + (selected ? ' selected' : '') + '" data-preset="' + esc(p.id) + '" title="' + esc(p.baseUrl) + '">' +
                 '<span class="provider-dot" style="background:' + esc(p.color || '#888888') + '"></span>' +
@@ -133,11 +152,13 @@ const SettingsProvider = (function () {
             '</button>';
         }).join('');
 
-        var customSelected = !form.presetId || form.presetId === 'custom';
-        html += '<button type="button" class="provider-tile' + (customSelected ? ' selected' : '') + '" data-preset="custom">' +
-            '<span class="provider-dot" style="background:#666666"></span>' +
-            '<span class="provider-tile-info"><span class="provider-tile-name">' + esc(t('provCustom')) + '</span></span>' +
-        '</button>';
+        if (expanded) {
+            var customSelected = !form.presetId || form.presetId === 'custom';
+            html += '<button type="button" class="provider-tile' + (customSelected ? ' selected' : '') + '" data-preset="custom">' +
+                '<span class="provider-dot" style="background:#666666"></span>' +
+                '<span class="provider-tile-info"><span class="provider-tile-name">' + esc(t('provCustom')) + '</span></span>' +
+            '</button>';
+        }
         return html;
     }
 
@@ -244,8 +265,18 @@ const SettingsProvider = (function () {
                     if (preset) form = fromPreset(preset);
                 }
                 render();
+                var formEl = root.querySelector('.provider-form');
+                if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             });
         });
+
+        var moreBtn = root.querySelector('#prov-more-btn');
+        if (moreBtn) {
+            moreBtn.addEventListener('click', function () {
+                expanded = !expanded;
+                render();
+            });
+        }
 
         root.querySelectorAll('.provider-row[data-open]').forEach(function (row) {
             row.addEventListener('click', function (e) {

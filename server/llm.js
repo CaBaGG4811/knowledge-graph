@@ -3,8 +3,8 @@ const http = require('http');
 const https = require('https');
 const { getOne } = require('./db');
 
-const DEFAULT_LLM_URL = process.env.LLM_URL || 'http://127.0.0.1:1234/v1/chat/completions';
-const DEFAULT_LLM_MODEL = process.env.LLM_MODEL || 'google/gemma-4-12b-qat';
+const DEFAULT_LLM_URL = process.env.LLM_URL || '';
+const DEFAULT_LLM_MODEL = process.env.LLM_MODEL || '';
 
 /* ============================================
    Популярные провайдеры (пресеты для интерфейса)

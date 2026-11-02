@@ -2,6 +2,8 @@
 const Store = (function () {
     'use strict';
 
+    var THEMES = ['dark', 'light', 'midnight', 'sand'];
+
     var state = {
         settings: { theme: 'dark', accentColor: '#e0e0e0', fontSize: 'medium', lang: 'ru', llmUrl: '', llmModel: '', activeProviderId: null }
     };
@@ -13,11 +15,16 @@ const Store = (function () {
         if (key === 'settings') applySettings(value);
     }
 
+    function normalizeTheme(theme) {
+        return THEMES.indexOf(theme) === -1 ? 'dark' : theme;
+    }
+
     function applySettings(s) {
         var root = document.documentElement;
-        root.setAttribute('data-theme', 'dark');
+        var theme = normalizeTheme(s.theme);
+        root.setAttribute('data-theme', theme);
         root.setAttribute('data-font-size', s.fontSize || 'medium');
-        root.style.setProperty('--font-size-base', '13px');
+        try { localStorage.setItem('kg_theme', theme); } catch (e) {}
     }
 
     return { get: get, set: set, applySettings: applySettings };
