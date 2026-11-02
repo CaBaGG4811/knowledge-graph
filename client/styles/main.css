@@ -707,6 +707,7 @@ body {
    Settings
    ============================================ */
 .settings-page { max-width: 600px; margin: 0 auto; padding: 24px; }
+.settings-topbar { margin-bottom: 18px; }
 .settings-title { font-size: calc(20px * var(--font-scale)); font-weight: 600; margin-bottom: 24px; color: #e0e0e0; }
 .settings-section { margin-bottom: 24px; }
 .settings-section-title { font-size: calc(11px * var(--font-scale)); font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
