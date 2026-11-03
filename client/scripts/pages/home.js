@@ -822,6 +822,9 @@ const HomePage = (function () {
                     <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${escapeHtml(topic)}</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="btn btn-sm" id="graph-fit" title="${t('graphFit')}" aria-label="${t('graphFit')}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 9 4 4 9 4"/><polyline points="20 9 20 4 15 4"/><polyline points="4 15 4 20 9 20"/><polyline points="20 15 20 20 15 20"/></svg>
+                    </button>
                     <button class="btn btn-sm" id="graph-save">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                         ${t('graphSave')}
@@ -840,6 +843,9 @@ const HomePage = (function () {
             if (container) container.style.opacity = '0';
             if (topbar) topbar.style.opacity = '0';
             setTimeout(function () { render(); }, 300);
+        });
+        document.getElementById('graph-fit').addEventListener('click', function () {
+            GraphRenderer.fit(false);
         });
         document.getElementById('graph-save').addEventListener('click', function () {
             askText(t('saveTreePrompt')).then(function (name) {

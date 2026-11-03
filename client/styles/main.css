@@ -672,8 +672,15 @@ body {
 /* ============================================
    Graph
    ============================================ */
-#graph-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; overflow: hidden; transition: opacity 0.3s; }
-#graph-container svg { width: 100%; height: 100%; }
+#graph-container {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    z-index: 1; overflow: hidden;
+    transition: opacity 0.3s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+#graph-container svg { width: 100%; height: 100%; display: block; }
 
 #top-bar.app-header {
     position: fixed; top: 0; left: 0; right: 0;
@@ -683,20 +690,36 @@ body {
     background: var(--c-panel);
     border-bottom: 1px solid var(--c-subtle);
 }
-.node-card-rect { transition: stroke 0.3s, stroke-width 0.3s, filter 0.3s, opacity 0.3s; }
-.knowledge-node { transition: opacity 0.3s; }
-.knowledge-node.dimmed { opacity: 0.1 !important; }
-.knowledge-node.dimmed .node-card-rect { filter: saturate(0.3); }
-.knowledge-node.highlighted .node-card-rect { filter: brightness(1.1); }
-.graph-link { fill: none; transition: stroke-opacity 0.3s; }
-.graph-link.dimmed { stroke-opacity: 0.03 !important; }
+
+/* Узлы графа */
+.knowledge-node { cursor: pointer; outline: none; }
+.knowledge-node .node-inner { will-change: transform, opacity; }
+.node-card-rect { transition: stroke-opacity 0.25s, filter 0.25s, stroke-width 0.2s; }
+.knowledge-node:hover .node-card-rect,
+.knowledge-node.highlighted .node-card-rect {
+    stroke-opacity: 1;
+    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.32));
+}
+.knowledge-node:focus-visible .node-card-rect {
+    stroke-opacity: 1;
+    stroke-width: 2.4px;
+}
+.knowledge-node.dimmed { opacity: 0.12 !important; }
+.knowledge-node.dimmed .node-card-rect { filter: saturate(0.35); }
+
+/* Связи */
+.graph-link-group { transition: opacity 0.25s; }
+.graph-link-group.dimmed { opacity: 0.05 !important; }
+.graph-link { fill: none; stroke-linecap: round; }
+.graph-port-group { transition: opacity 0.25s; }
+.graph-port-group.dimmed { opacity: 0.05 !important; }
+.graph-link-port { pointer-events: none; }
+
 .node-card-title, .node-card-desc, .node-card-time { pointer-events: none; }
 .node-card-title { font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif; font-weight: 600; letter-spacing: 0.2px; }
-.node-card-desc { font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif; font-weight: 300; letter-spacing: 0.2px; }
+.node-card-desc { font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif; font-weight: 400; letter-spacing: 0.2px; }
 .node-card-time { font-family: 'Cascadia Code', 'Consolas', monospace; letter-spacing: 0.3px; }
-.node-accent-bar { pointer-events: none; }
-.knowledge-node { cursor: pointer; }
-.knowledge-node:hover .node-card-rect { stroke: var(--c-secondary); filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55)); }
+.node-accent-bar, .node-pill-dot, .node-diff-dot { pointer-events: none; }
 
 /* ============================================
    Settings

@@ -1,502 +1,971 @@
-/* graph.js — D3.js модуль рендера деревьев знаний */
+/* graph.js — интерактивное дерево знаний: раскладка, камера, анимации */
 const GraphRenderer = (function () {
     'use strict';
 
-    var CARD_SIZES = {
-        0: { width: 300, height: 124 },
-        1: { width: 260, height: 112 },
-        2: { width: 240, height: 104 },
-        3: { width: 224, height: 100 },
-        4: { width: 210, height: 96 }
-    };
+    // Цвета веток: наследуются от темы первого уровня вниз
+    var BRANCH_COLORS = [
+        '#e8695f', '#4a86c8', '#e0a13a', '#3f9e82',
+        '#9a7bd4', '#d97a45', '#4f9fb8', '#c2668f'
+    ];
 
-    function difficultyColor(diff) {
+    var FONT_FAMILY = '"Segoe UI", "Inter", system-ui, -apple-system, sans-serif';
+    var MONO_FAMILY = '"Cascadia Code", "Consolas", monospace';
+
+    var current = null;
+    var resizeTimer = null;
+    var measureCtx = null;
+    var highlightTimer = null;
+
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function round(value) {
+        return Math.round(value * 10) / 10;
+    }
+
+    function clearTimers() {
+        if (current && current.timers) {
+            current.timers.forEach(function (id) { clearTimeout(id); });
+            current.timers = [];
+        }
+    }
+
+    function later(fn, ms) {
+        var id = setTimeout(fn, ms);
+        if (current) current.timers.push(id);
+        return id;
+    }
+
+    function measureText(text, size, weight) {
+        if (!measureCtx) {
+            var canvas = document.createElement('canvas');
+            measureCtx = canvas.getContext('2d');
+        }
+        measureCtx.font = (weight || 600) + ' ' + size + 'px ' + FONT_FAMILY;
+        var width = measureCtx.measureText(String(text || '')).width;
+        // небольшой запас на letter-spacing
+        return width + String(text || '').length * 0.2;
+    }
+
+    function ellipsize(text, maxWidth, size, weight) {
+        var value = String(text || '').trim();
+        if (!value) return '';
+        if (measureText(value, size, weight) <= maxWidth) return value;
+        var cut = value;
+        while (cut.length > 1 && measureText(cut + '\u2026', size, weight) > maxWidth) {
+            cut = cut.slice(0, -1);
+        }
+        return cut.replace(/[\s,.;:!?\-\u2014]+$/, '') + '\u2026';
+    }
+
+    function wrapText(text, maxWidth, maxLines, size, weight) {
+        var words = String(text || '').trim().split(/\s+/).filter(function (w) { return w.length > 0; });
+        if (!words.length) return [''];
+
+        var all = [];
+        var line = '';
+        for (var i = 0; i < words.length; i++) {
+            var candidate = line ? line + ' ' + words[i] : words[i];
+            if (!line || measureText(candidate, size, weight) <= maxWidth) {
+                line = candidate;
+            } else {
+                all.push(line);
+                line = words[i];
+            }
+        }
+        if (line) all.push(line);
+
+        var lines = all.slice(0, maxLines);
+        for (var j = 0; j < lines.length; j++) {
+            lines[j] = ellipsize(lines[j], maxWidth, size, weight);
+        }
+        if (all.length > maxLines) {
+            var last = lines[maxLines - 1];
+            lines[maxLines - 1] = ellipsize(last + '\u2026', maxWidth, size, weight);
+        }
+        return lines;
+    }
+
+    function shortDescription(text) {
+        var value = String(text || '').trim();
+        if (!value) return '';
+        var sentences = value.match(/[^.!?]+[.!?]+/g);
+        if (!sentences || sentences.length <= 2) return value;
+        return (sentences[0] + ' ' + sentences[1]).trim();
+    }
+
+    function fontScale() {
+        var settings = (typeof Store !== 'undefined' && Store.get('settings')) || {};
+        if (settings.fontSize === 'small') return 0.9;
+        if (settings.fontSize === 'large') return 1.16;
+        return 1;
+    }
+
+    function difficultyColor(value) {
+        var diff = clamp(Number(value) || 3, 1, 5);
         if (diff <= 2) return '#22c55e';
         if (diff === 3) return '#eab308';
         if (diff === 4) return '#f97316';
         return '#ef4444';
     }
 
-    // масштаб текста карточек из настроек внешнего вида
-    function fontScale() {
-        var s = (typeof Store !== 'undefined' && Store.get('settings')) || {};
-        if (s.fontSize === 'small') return 0.88;
-        if (s.fontSize === 'large') return 1.18;
-        return 1;
+    function cssVar(styles, name, fallback) {
+        var value = styles.getPropertyValue(name).trim();
+        return value || fallback;
     }
 
-    var currentEdgesProcessed = [];
-    var currentGraphData = null;
-    var currentTopicName = '';
-    var resizeTimer = null;
+    /* ============================================
+       Модель дерева: DAG → дерево без дублей
+       ============================================ */
 
-    function truncateText(text, maxLen) {
-        if (!text) return '';
-        return text.length <= maxLen ? text : text.substring(0, maxLen - 1) + '\u2026';
-    }
+    function buildTree(nodes, edges) {
+        var map = {};
+        var indegree = {};
+        var outdegree = {};
 
-    // заголовок максимум на 2 строки, с многоточием если не влезло
-    function wrapTitle(text, maxLen) {
-        if (!text) return [''];
-        var words = String(text).split(/\s+/).filter(function (w) { return w.length > 0; });
-        var lines = ['', ''];
-        var li = 0;
-        var i = 0;
-        for (i = 0; i < words.length && li < 2; i++) {
-            var w = words[i];
-            if (lines[li].length === 0) {
-                lines[li] = w;
-            } else if ((lines[li] + ' ' + w).length <= maxLen) {
-                lines[li] += ' ' + w;
-            } else {
-                li++;
-                i--;
+        nodes.forEach(function (node, index) {
+            map[node.id] = {
+                id: node.id,
+                label: node.label || node.id,
+                description: node.description || '',
+                why: node.why || '',
+                difficulty: node.difficulty || 3,
+                time: node.time || '',
+                leadsTo: node.leadsTo || [],
+                level: node.level,
+                order: index,
+                children: [],
+                parent: null,
+                depth: 0,
+                tx: 0,
+                ty: 0
+            };
+            indegree[node.id] = 0;
+            outdegree[node.id] = 0;
+        });
+
+        var adjacency = {};
+        edges.forEach(function (edge) {
+            var source = typeof edge.source === 'object' ? edge.source.id : edge.source;
+            var target = typeof edge.target === 'object' ? edge.target.id : edge.target;
+            if (!map[source] || !map[target] || source === target) return;
+            (adjacency[source] = adjacency[source] || []).push(target);
+            outdegree[source] = (outdegree[source] || 0) + 1;
+            indegree[target] = (indegree[target] || 0) + 1;
+        });
+
+        // Корень: узел без входящих связей; иначе — самый «разветвлённый»
+        var zero = nodes.filter(function (node) { return (indegree[node.id] || 0) === 0; });
+        var rootNode;
+        if (zero.length) {
+            rootNode = zero.slice().sort(function (a, b) {
+                return (outdegree[b.id] || 0) - (outdegree[a.id] || 0);
+            })[0];
+        } else {
+            rootNode = nodes.slice().sort(function (a, b) {
+                return (outdegree[b.id] || 0) - (outdegree[a.id] || 0);
+            })[0];
+        }
+        var root = map[rootNode.id];
+
+        // Обход в ширину: у каждого узла ровно один родитель
+        var visited = {};
+        var queue = [root];
+        var head = 0;
+        visited[root.id] = true;
+
+        while (head < queue.length) {
+            var parent = queue[head++];
+            var targets = adjacency[parent.id] || [];
+            for (var i = 0; i < targets.length; i++) {
+                var id = targets[i];
+                if (!map[id] || visited[id]) continue;
+                visited[id] = true;
+                var child = map[id];
+                child.parent = parent;
+                child.depth = parent.depth + 1;
+                parent.children.push(child);
+                queue.push(child);
             }
         }
-        var overflow = i < words.length;
-        var result = lines[1].length > 0 ? lines : [lines[0]];
-        if (overflow && result.length === 2) result[1] = truncateText(result[1], maxLen - 1);
-        result = result.map(function (l) { return truncateText(l, maxLen); });
-        return result;
-    }
 
-    function shortDescription(text) {
-        if (!text) return '';
-        var sentences = text.match(/[^.!?]+[.!?]+/g);
-        if (!sentences || sentences.length <= 2) return text;
-        return (sentences[0] + sentences[1]).trim();
-    }
+        // Несвязные части графа подвешиваем к корню, чтобы ничего не потерять
+        nodes.forEach(function (node) {
+            if (visited[node.id]) return;
+            var child = map[node.id];
+            child.parent = root;
+            child.depth = 1;
+            root.children.push(child);
+            visited[child.id] = true;
 
-    function computeCardWidth(depth, titleLen) {
-        var base = CARD_SIZES[depth] || CARD_SIZES[4];
-        var w = base.width;
-        if (titleLen > 22) w += Math.min(60, Math.round((titleLen - 22) * 2.5));
-        return w;
-    }
-
-    function findRootNodeId(nodes, edges) {
-        var explicitRoot = nodes.find(function (n) { return n.level === 1; });
-        if (explicitRoot) return explicitRoot.id;
-        var outgoing = {};
-        nodes.forEach(function (n) { outgoing[n.id] = 0; });
-        edges.forEach(function (e) {
-            var src = typeof e.source === 'object' ? e.source.id : e.source;
-            if (outgoing[src] !== undefined) outgoing[src]++;
-        });
-        var maxDeg = -1;
-        var rootId = nodes[0].id;
-        nodes.forEach(function (n) {
-            if (outgoing[n.id] > maxDeg) { maxDeg = outgoing[n.id]; rootId = n.id; }
-        });
-        return rootId;
-    }
-
-    function buildHierarchy(nodes, edges, rootId) {
-        var nodeById = {};
-        nodes.forEach(function (n) { nodeById[n.id] = Object.assign({}, n, { children: [] }); });
-        var childOfSomeone = new Set();
-        edges.forEach(function (e) {
-            var src = typeof e.source === 'object' ? e.source.id : e.source;
-            var tgt = typeof e.target === 'object' ? e.target.id : e.target;
-            if (nodeById[src] && nodeById[tgt] && src !== tgt) {
-                nodeById[src].children.push(nodeById[tgt]);
-                childOfSomeone.add(tgt);
+            var part = [child];
+            var partHead = 0;
+            while (partHead < part.length) {
+                var partParent = part[partHead++];
+                (adjacency[partParent.id] || []).forEach(function (targetId) {
+                    if (!map[targetId] || visited[targetId]) return;
+                    visited[targetId] = true;
+                    var partChild = map[targetId];
+                    partChild.parent = partParent;
+                    partChild.depth = partParent.depth + 1;
+                    partParent.children.push(partChild);
+                    part.push(partChild);
+                });
             }
         });
-        var root = nodeById[rootId] || nodeById[nodes[0].id];
-        nodes.forEach(function (n) {
-            if (n.id !== root.id && !childOfSomeone.has(n.id) && nodeById[n.id]) {
-                root.children.push(nodeById[n.id]);
-            }
-        });
-        var visited = new Set();
-        function pruneCycles(node) {
-            if (!node) return;
-            if (visited.has(node.id)) { node.children = []; return; }
-            visited.add(node.id);
-            node.children.forEach(pruneCycles);
-        }
-        pruneCycles(root);
+
         return root;
     }
 
-    function getConnectedNodeIds(nodeId) {
-        var connected = new Set();
-        connected.add(nodeId);
-        currentEdgesProcessed.forEach(function (e) {
-            if (e.source.id === nodeId) connected.add(e.target.id);
-            if (e.target.id === nodeId) connected.add(e.source.id);
-        });
-        return connected;
-    }
+    /* ============================================
+       Визуальные параметры узлов
+       ============================================ */
 
-    function applyHoverEffect(hoveredNodeId) {
-        var connected = getConnectedNodeIds(hoveredNodeId);
-        d3.selectAll('.knowledge-node').each(function (d) {
-            var el = d3.select(this);
-            el.classed('dimmed', !connected.has(d.id)).classed('highlighted', d.id === hoveredNodeId);
-        });
-        d3.selectAll('.graph-link').each(function (d) {
-            d3.select(this).classed('dimmed', !(connected.has(d.source.id) && connected.has(d.target.id)));
-        });
-    }
+    function makeSpec(node, depth) {
+        var fs = fontScale();
+        var label = node.label || node.id;
 
-    function removeHoverEffect() {
-        d3.selectAll('.knowledge-node').classed('dimmed', false).classed('highlighted', false);
-        d3.selectAll('.graph-link').classed('dimmed', false);
-    }
-
-    function highlightConnections(nodeId, nodesFlat) {
-        var connected = new Set();
-        connected.add(nodeId);
-        currentEdgesProcessed.forEach(function (e) {
-            if (e.source.id === nodeId) connected.add(e.target.id);
-            if (e.target.id === nodeId) connected.add(e.source.id);
-        });
-        d3.selectAll('.knowledge-node').each(function (d) {
-            var el = d3.select(this);
-            el.classed('dimmed', !connected.has(d.id));
-        });
-        d3.selectAll('.graph-link').each(function (d) {
-            d3.select(this).classed('dimmed', !(connected.has(d.source.id) && connected.has(d.target.id)));
-        });
-        setTimeout(function () {
-            d3.selectAll('.knowledge-node').classed('dimmed', false);
-            d3.selectAll('.graph-link').classed('dimmed', false);
-        }, 3000);
-    }
-
-    // Раскладка без наложений: раздвигаем карточки в каждом ряду,
-    // затем центрируем родителей над детьми (снизу вверх), повторяем
-    function layoutWithoutOverlaps(nodesFlat, childrenMap) {
-        var byDepth = {};
-        nodesFlat.forEach(function (n) { (byDepth[n.depth] = byDepth[n.depth] || []).push(n); });
-        var maxDepth = 0;
-        nodesFlat.forEach(function (n) { if (n.depth > maxDepth) maxDepth = n.depth; });
-
-        function relax() {
-            Object.keys(byDepth).map(Number).forEach(function (dep) {
-                var row = byDepth[dep].sort(function (a, b) { return a.tx - b.tx; });
-                for (var i = 1; i < row.length; i++) {
-                    var need = (row[i - 1].cardWidth + row[i].cardWidth) / 2 + 70;
-                    if (row[i].tx - row[i - 1].tx < need) row[i].tx = row[i - 1].tx + need;
-                }
-            });
-        }
-        function recenter() {
-            for (var dep = maxDepth; dep >= 1; dep--) {
-                byDepth[dep - 1].forEach(function (p) {
-                    var kids = childrenMap[p.id] || [];
-                    if (!kids.length) return;
-                    var sum = 0, cnt = 0;
-                    kids.forEach(function (id) {
-                        for (var j = 0; j < nodesFlat.length; j++) {
-                            if (nodesFlat[j].id === id) { sum += nodesFlat[j].tx; cnt++; break; }
-                        }
-                    });
-                    if (cnt) p.tx = sum / cnt;
-                });
-            }
-        }
-        relax(); recenter(); relax(); recenter(); relax();
-    }
-
-    function renderGraph(graphData, topicName) {
-        var container = document.getElementById('graph-container');
-        if (!container) return;
-        container.innerHTML = '';
-        currentEdgesProcessed = [];
-        currentGraphData = graphData;
-        currentTopicName = topicName;
-        if (typeof ModalManager !== 'undefined' && ModalManager.setTopic) ModalManager.setTopic(topicName);
-
-        var width = window.innerWidth;
-        var height = window.innerHeight;
-
-        var svg = d3.select('#graph-container').append('svg').attr('width', width).attr('height', height);
-
-        var theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        var isDark = theme !== 'light' && theme !== 'sand';
-        var rootStyles = getComputedStyle(document.documentElement);
-        function cssVar(name, fallback) {
-            var value = rootStyles.getPropertyValue(name).trim();
-            return value || fallback;
+        if (depth === 0) {
+            var rootSize = 18 * fs;
+            var rootWidth = clamp(measureText(label, rootSize, 600) + 64, 380, 540);
+            var rootTextWidth = rootWidth - 60;
+            var rootLines = wrapText(label, rootTextWidth, 2, rootSize, 600);
+            var rootHeight = rootLines.length > 1 ? 120 : 104;
+            return {
+                shape: 'rect',
+                width: rootWidth,
+                height: rootHeight,
+                rx: 24,
+                titleSize: rootSize,
+                titleLines: rootLines,
+                titleBaselines: rootLines.length > 1 ? [-20, 0] : [-4],
+                desc: ellipsize(shortDescription(node.description), rootTextWidth, 11 * fs, 400),
+                descSize: 11 * fs,
+                descBaseline: rootLines.length > 1 ? 26 : 20,
+                barY: -rootHeight / 2 + 16,
+                footY: rootHeight / 2 - 14
+            };
         }
 
-        var defs = svg.append('defs');
-
-        var bgGrad = defs.append('radialGradient').attr('id', 'vignette-bg').attr('cx', '50%').attr('cy', '55%').attr('r', '55%');
-        bgGrad.append('stop').attr('offset', '0%').attr('stop-color', cssVar('--c-panel', '#0a0a0a'));
-        bgGrad.append('stop').attr('offset', '100%').attr('stop-color', cssVar('--c-bg', '#000000'));
-        svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'url(#vignette-bg)');
-
-        // мягкая тень под карточками
-        var cardShadow = defs.append('filter').attr('id', 'card-shadow').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
-        cardShadow.append('feDropShadow').attr('dx', 0).attr('dy', 3).attr('stdDeviation', 4)
-            .attr('flood-color', '#000000').attr('flood-opacity', isDark ? 0.55 : 0.18);
-
-        function addGrad(id, c1, c2) {
-            var g = defs.append('linearGradient').attr('id', id).attr('x1', '0%').attr('y1', '0%').attr('x2', '100%').attr('y2', '100%');
-            g.append('stop').attr('offset', '0%').attr('stop-color', c1);
-            g.append('stop').attr('offset', '100%').attr('stop-color', c2);
-        }
-        addGrad('card-gradient-root', cssVar('--c-subtle', '#1c1c1c'), cssVar('--c-card', '#101010'));
-        addGrad('card-gradient-l1', cssVar('--c-card', '#141414'), cssVar('--c-panel', '#0e0e0e'));
-        addGrad('card-gradient-l2', cssVar('--c-card', '#131313'), cssVar('--c-panel', '#0d0d0d'));
-        addGrad('card-gradient-l3', cssVar('--c-card', '#121212'), cssVar('--c-panel', '#0c0c0c'));
-        addGrad('card-gradient-l4', cssVar('--c-card', '#111111'), cssVar('--c-panel', '#0b0b0b'));
-
-        var graphGroup = svg.append('g').attr('class', 'graph-root');
-        var zoomBehavior = d3.zoom().scaleExtent([0.15, 4]).on('zoom', function (e) { graphGroup.attr('transform', e.transform); });
-        svg.call(zoomBehavior);
-
-        // дерево
-        var rootId = findRootNodeId(graphData.nodes, graphData.edges);
-        var hierarchyRoot = buildHierarchy(graphData.nodes, graphData.edges, rootId);
-        var d3Hierarchy = d3.hierarchy(hierarchyRoot);
-
-        d3.tree().nodeSize([560, 250])(d3Hierarchy);
-
-        var childrenMap = {};
-        d3Hierarchy.links().forEach(function (l) {
-            var pid = l.source.data.id;
-            (childrenMap[pid] = childrenMap[pid] || []).push(l.target.data.id);
-        });
-
-        // плоский массив
-        var nodesFlat = [];
-        d3Hierarchy.descendants().forEach(function (d) {
-            var orig = d.data;
-            var cw = computeCardWidth(d.depth, (orig.label || '').length);
-            var ch = (CARD_SIZES[d.depth] || CARD_SIZES[4]).height;
-            nodesFlat.push({
-                id: orig.id, label: orig.label, description: orig.description,
-                why: orig.why || '', difficulty: orig.difficulty || 3,
-                time: orig.time || '', leadsTo: orig.leadsTo || [],
-                level: orig.level, depth: d.depth,
-                tx: d.x, ty: -d.y,
-                cardWidth: cw, cardHeight: ch
-            });
-        });
-
-        // убираем наложения карточек
-        layoutWithoutOverlaps(nodesFlat, childrenMap);
-
-        // центрируем
-        var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        nodesFlat.forEach(function (n) {
-            if (n.tx < minX) minX = n.tx;
-            if (n.tx > maxX) maxX = n.tx;
-            if (n.ty < minY) minY = n.ty;
-            if (n.ty > maxY) maxY = n.ty;
-        });
-        var offX = width / 2 - (minX + maxX) / 2;
-        var offY = height * 0.82 - maxY;
-        nodesFlat.forEach(function (n) { n.tx += offX; n.ty += offY; });
-
-        var nodeById = {};
-        nodesFlat.forEach(function (n) { nodeById[n.id] = n; });
-
-        var edgesProcessed = [];
-        d3Hierarchy.links().forEach(function (link) {
-            if (nodeById[link.source.data.id] && nodeById[link.target.data.id]) {
-                edgesProcessed.push({ source: nodeById[link.source.data.id], target: nodeById[link.target.data.id] });
-            }
-        });
-        currentEdgesProcessed = edgesProcessed;
-
-        // связи
-        var linkGroup = graphGroup.append('g').attr('class', 'links-layer');
-        function curvePath(src, tgt) {
-            var sx = src.tx, sy = src.ty - src.cardHeight / 2;
-            var tx = tgt.tx, ty = tgt.ty + tgt.cardHeight / 2;
-            var midY = (sy + ty) / 2;
-            var cpx = (tx - sx) * 0.02;
-            return 'M ' + sx + ' ' + sy + ' C ' + (sx + cpx) + ' ' + midY + ', ' + (tx - cpx) + ' ' + midY + ', ' + tx + ' ' + ty;
+        if (depth === 1) {
+            var chapterSize = 13.5 * fs;
+            var chapterWidth = clamp(measureText(label, chapterSize, 600) + 54, 220, 340);
+            var chapterTextWidth = chapterWidth - 44;
+            var chapterLines = wrapText(label, chapterTextWidth, 2, chapterSize, 600);
+            var chapterHeight = chapterLines.length > 1 ? 110 : 94;
+            return {
+                shape: 'rect',
+                width: chapterWidth,
+                height: chapterHeight,
+                rx: 18,
+                titleSize: chapterSize,
+                titleLines: chapterLines,
+                titleBaselines: chapterLines.length > 1 ? [-15, 3] : [-1],
+                desc: ellipsize(shortDescription(node.description), chapterTextWidth, 10 * fs, 400),
+                descSize: 10 * fs,
+                descBaseline: chapterLines.length > 1 ? 25 : 19,
+                barY: -chapterHeight / 2 + 14,
+                footY: chapterHeight / 2 - 13
+            };
         }
 
-        var rootNode = nodeById[rootId];
-
-        var linkElements = linkGroup.selectAll('path').data(edgesProcessed).enter()
-            .append('path').attr('class', 'graph-link')
-            .attr('stroke', cssVar('--c-strong', '#4a4a4a'))
-            .attr('stroke-width', function (d) { return d.source.depth === 0 ? 2 : 1.25; })
-            .attr('stroke-opacity', 0)
-            .attr('d', function (d) { return curvePath(d.source, d.target); });
-
-        // карточки
-        var nodeGroup = graphGroup.append('g').attr('class', 'nodes-layer');
-        var nodeElements = nodeGroup.selectAll('g').data(nodesFlat).enter()
-            .append('g').attr('class', 'knowledge-node')
-            .attr('opacity', 0)
-            .attr('transform', function (d) { return 'translate(' + d.tx + ',' + d.ty + ')'; });
-
-        nodeElements.append('rect').attr('class', 'node-card-rect')
-            .attr('width', function (d) { return d.cardWidth; })
-            .attr('height', function (d) { return d.cardHeight; })
-            .attr('x', function (d) { return -d.cardWidth / 2; })
-            .attr('y', function (d) { return -d.cardHeight / 2; })
-            .attr('rx', 12).attr('ry', 12)
-            .attr('fill', function (d) { return 'url(#card-gradient-' + (d.depth === 0 ? 'root' : 'l' + Math.min(d.depth, 4)) + ')'; })
-            .attr('stroke', function (d) {
-                return d.depth === 0 ? cssVar('--c-secondary-strong', '#5f5f5f') : cssVar('--c-border', '#2e2e2e');
-            })
-            .attr('stroke-width', function (d) { return d.depth === 0 ? 1.5 : 1; })
-            .attr('filter', 'url(#card-shadow)');
-
-        nodeElements.each(function (d) {
-            var g = d3.select(this);
-            var isRoot = d.depth === 0;
-
-            // цветная полоска-акцент сверху (цвет = сложность)
-            g.append('rect').attr('class', 'node-accent-bar')
-                .attr('width', 34).attr('height', 3).attr('rx', 1.5)
-                .attr('x', -17)
-                .attr('y', -d.cardHeight / 2 + 10)
-                .attr('fill', difficultyColor(d.difficulty || 3))
-                .attr('opacity', 0.85);
-
-            // заголовок — до 2 строк
-            var fs = fontScale();
-            var titleLines = wrapTitle(d.label || '', isRoot ? 26 : 23);
-            var titleStartY = -d.cardHeight / 2 + 34;
-            titleLines.forEach(function (line, i) {
-                g.append('text').attr('class', 'node-card-title')
-                    .text(line)
-                    .attr('text-anchor', 'middle')
-                    .attr('x', 0)
-                    .attr('y', titleStartY + i * 17)
-                    .attr('font-size', ((isRoot ? 14 : 12.5) * fs).toFixed(2) + 'px')
-                    .attr('fill', cssVar('--c-text', '#ececec'));
-            });
-
-            // описание — одна строка, ниже заголовка
-            if (d.description) {
-                var descY = Math.max(d.cardHeight / 2 - 32, titleStartY + (titleLines.length - 1) * 17 + 14);
-                g.append('text').attr('class', 'node-card-desc')
-                    .text(truncateText(shortDescription(d.description), 34))
-                    .attr('text-anchor', 'middle')
-                    .attr('x', 0)
-                    .attr('y', descY)
-                    .attr('font-size', (10 * fs).toFixed(2) + 'px')
-                    .attr('fill', cssVar('--c-secondary', '#8f8f8f'));
-            }
-
-            // сложность — точки слева снизу
-            var diff = Math.min(5, Math.max(1, d.difficulty || 3));
-            var footY = d.cardHeight / 2 - 14;
-            var startX = -d.cardWidth / 2 + 14;
-            for (var i = 0; i < 5; i++) {
-                g.append('circle').attr('class', 'node-diff-dot')
-                    .attr('cx', startX + i * 9)
-                    .attr('cy', footY)
-                    .attr('r', 2.5)
-                    .attr('fill', i < diff ? difficultyColor(diff) : cssVar('--c-subtle', '#262626'));
-            }
-
-            // время — справа снизу
-            if (d.time) {
-                g.append('text').attr('class', 'node-card-time')
-                    .text(truncateText(d.time, 16))
-                    .attr('text-anchor', 'end')
-                    .attr('x', d.cardWidth / 2 - 14)
-                    .attr('y', footY + 3.5)
-                    .attr('font-size', (9 * fs).toFixed(2) + 'px')
-                    .attr('fill', cssVar('--c-muted', '#787878'));
-            }
-        });
-
-        // клик — модалка
-        nodeElements.on('click', function (event, d) {
-            event.stopPropagation();
-            ModalManager.openModal(d, graphData);
-        });
-
-        // hover
-        nodeElements.on('mouseenter', function (event, d) { applyHoverEffect(d.id); })
-            .on('mouseleave', function () { removeHoverEffect(); });
-
-        // анимация: волны по уровням, карточка выезжает из родительской
-        var nodesByDepth = {};
-        nodesFlat.forEach(function (n) {
-            if (!nodesByDepth[n.depth]) nodesByDepth[n.depth] = [];
-            nodesByDepth[n.depth].push(n);
-        });
-        var sortedDepths = Object.keys(nodesByDepth).map(Number).sort(function (a, b) { return a - b; });
-        var cumDelay = 200;
-
-        sortedDepths.forEach(function (dep) {
-            nodesByDepth[dep].forEach(function (nd, idx) {
-                var delay = cumDelay + idx * 60;
-                setTimeout(function () {
-                    var sel = nodeElements.filter(function (n) { return n.id === nd.id; });
-                    var sx = width / 2, sy = height / 2;
-                    if (nd.depth > 0) {
-                        var pl = d3Hierarchy.links().find(function (l) { return l.target.data.id === nd.id; });
-                        if (pl) { sx = nodeById[pl.source.data.id].tx; sy = nodeById[pl.source.data.id].ty; }
-                    }
-                    sel.attr('transform', 'translate(' + sx + ',' + sy + ') scale(0.45)').attr('opacity', 0)
-                        .transition().duration(520).ease(d3.easeBackOut.overshoot(1.3))
-                        .attr('opacity', 1).attr('transform', 'translate(' + nd.tx + ',' + nd.ty + ') scale(1)');
-                }, delay);
-            });
-            cumDelay += nodesByDepth[dep].length * 60 + 320;
-        });
-
-        // линии — плавная прорисовка
-        var linksByDepth = {};
-        edgesProcessed.forEach(function (e) {
-            if (!linksByDepth[e.source.depth]) linksByDepth[e.source.depth] = [];
-            linksByDepth[e.source.depth].push(e);
-        });
-        var sortedLinkDeps = Object.keys(linksByDepth).map(Number).sort(function (a, b) { return a - b; });
-        var linkDelay = 420;
-        sortedLinkDeps.forEach(function (dep) {
-            setTimeout(function () {
-                linkElements.filter(function (l) { return l.source.depth === dep; }).each(function () {
-                    var pathEl = d3.select(this);
-                    var totalLen = this.getTotalLength();
-                    pathEl.attr('stroke-dasharray', totalLen).attr('stroke-dashoffset', totalLen)
-                        .attr('stroke-opacity', isDark ? 0.5 : 0.8)
-                        .transition().duration(700).ease(d3.easeQuadOut).attr('stroke-dashoffset', 0);
-                });
-            }, linkDelay);
-            linkDelay += 280;
-        });
-
-        // плавный фокус: вписываем всё дерево в экран
-        var totalAnimTime = cumDelay + 400;
-        setTimeout(function () {
-            var bx1 = Infinity, bx2 = -Infinity, by1 = Infinity, by2 = -Infinity;
-            nodesFlat.forEach(function (n) {
-                if (n.tx - n.cardWidth / 2 < bx1) bx1 = n.tx - n.cardWidth / 2;
-                if (n.tx + n.cardWidth / 2 > bx2) bx2 = n.tx + n.cardWidth / 2;
-                if (n.ty - n.cardHeight / 2 < by1) by1 = n.ty - n.cardHeight / 2;
-                if (n.ty + n.cardHeight / 2 > by2) by2 = n.ty + n.cardHeight / 2;
-            });
-            var bw = Math.max(1, bx2 - bx1), bh = Math.max(1, by2 - by1);
-            var scale = Math.min(1, (width - 120) / bw, (height - 180) / bh);
-            scale = Math.max(scale, 0.2);
-            var tx = width / 2 - (bx1 + bx2) / 2 * scale;
-            var ty = height / 2 - (by1 + by2) / 2 * scale;
-            var transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
-            svg.transition().duration(900).ease(d3.easeCubicInOut).call(zoomBehavior.transform, transform);
-        }, totalAnimTime);
-
-        // публичный метод для подсветки связей
-window._graphHighlight = function (nodeId) {
-            highlightConnections(nodeId, nodesFlat);
+        var pillSize = 12 * fs;
+        var pillWidth = clamp(measureText(label, pillSize, 600) + 64, 132, 320);
+        var pillTextWidth = pillWidth - 60;
+        return {
+            shape: 'pill',
+            width: pillWidth,
+            height: 54,
+            rx: 27,
+            titleSize: pillSize,
+            titleLines: wrapText(label, pillTextWidth, 1, pillSize, 600),
+            desc: '',
+            descSize: 0,
+            titleBaselines: [0]
         };
     }
 
-    // перерисовка графа при ресайзе окна (один слушатель на модуль)
+    /* ============================================
+       Раскладка: поддеревья без наложений
+       ============================================ */
+
+    function decorate(root) {
+        var depths = [];
+
+        function walk(node, depth, branch) {
+            node.depth = depth;
+            node.branch = depth === 0 ? null : branch;
+            node.spec = makeSpec(node, depth);
+            (depths[depth] = depths[depth] || []).push(node);
+
+            node.children.forEach(function (child, index) {
+                var color = depth === 0
+                    ? BRANCH_COLORS[index % BRANCH_COLORS.length]
+                    : branch;
+                walk(child, depth + 1, color);
+            });
+        }
+
+        walk(root, 0, null);
+        return depths;
+    }
+
+    function measureSubtree(root) {
+        function measure(node) {
+            if (!node.children.length) {
+                node.subtreeWidth = node.spec.width;
+                return node.subtreeWidth;
+            }
+            var gap = node.depth === 0 ? 64 : 30;
+            var total = 0;
+            node.children.forEach(function (child, index) {
+                total += measure(child);
+                if (index > 0) total += gap;
+            });
+            node.subtreeWidth = Math.max(node.spec.width, total);
+            return node.subtreeWidth;
+        }
+        measure(root);
+    }
+
+    function placeSubtree(root) {
+        function place(node, left) {
+            node.tx = left + node.subtreeWidth / 2;
+            if (!node.children.length) return;
+
+            var gap = node.depth === 0 ? 64 : 30;
+            var total = 0;
+            node.children.forEach(function (child, index) {
+                total += child.subtreeWidth;
+                if (index > 0) total += gap;
+            });
+
+            var cursor = node.tx - total / 2;
+            node.children.forEach(function (child) {
+                place(child, cursor);
+                cursor += child.subtreeWidth + gap;
+            });
+        }
+        place(root, 0);
+    }
+
+    function placeRows(depths) {
+        var maxHeight = [];
+        var maxDepth = depths.length - 1;
+
+        depths.forEach(function (row, depth) {
+            maxHeight[depth] = 0;
+            row.forEach(function (node) {
+                if (node.spec.height > maxHeight[depth]) maxHeight[depth] = node.spec.height;
+            });
+        });
+
+        var rowTop = [0];
+        for (var depth = 1; depth <= maxDepth; depth++) {
+            var gap = depth === 1 ? 82 : 58;
+            rowTop[depth] = rowTop[depth - 1] + maxHeight[depth - 1] + gap;
+        }
+
+        depths.forEach(function (row, depth) {
+            row.forEach(function (node) {
+                node.ty = rowTop[depth] + maxHeight[depth] / 2;
+            });
+        });
+    }
+
+    function layoutAll(root) {
+        var depths = decorate(root);
+        measureSubtree(root);
+        placeSubtree(root);
+        placeRows(depths);
+
+        var all = [];
+        depths.forEach(function (row) { all = all.concat(row); });
+
+        // Центрируем всё дерево по горизонтали
+        var minX = Infinity;
+        var maxX = -Infinity;
+        all.forEach(function (node) {
+            minX = Math.min(minX, node.tx - node.spec.width / 2);
+            maxX = Math.max(maxX, node.tx + node.spec.width / 2);
+        });
+        var shift = -(minX + maxX) / 2;
+        all.forEach(function (node) { node.tx += shift; });
+
+        return { root: root, depths: depths, nodes: all };
+    }
+
+    /* ============================================
+       Камера
+       ============================================ */
+
+    function rootTransform(root, width) {
+        var scale = clamp(Math.min(1, (width - 48) / (root.spec.width + 90)), 0.5, 1);
+        return d3.zoomIdentity
+            .translate(width / 2 - root.tx * scale, 150 - root.ty * scale)
+            .scale(scale);
+    }
+
+    function fitTransform(nodes, width, height) {
+        var x1 = Infinity, x2 = -Infinity, y1 = Infinity, y2 = -Infinity;
+        nodes.forEach(function (node) {
+            x1 = Math.min(x1, node.tx - node.spec.width / 2);
+            x2 = Math.max(x2, node.tx + node.spec.width / 2);
+            y1 = Math.min(y1, node.ty - node.spec.height / 2);
+            y2 = Math.max(y2, node.ty + node.spec.height / 2);
+        });
+
+        var padX = width < 640 ? 32 : 72;
+        var padTop = 88;
+        var padBottom = 56;
+        var boxWidth = Math.max(1, x2 - x1);
+        var boxHeight = Math.max(1, y2 - y1);
+        var scale = Math.min(
+            (width - padX * 2) / boxWidth,
+            (height - padTop - padBottom) / boxHeight,
+            1.05
+        );
+        scale = clamp(scale, 0.12, 1.05);
+
+        var cx = (x1 + x2) / 2;
+        var cy = (y1 + y2) / 2;
+        return d3.zoomIdentity
+            .translate(
+                width / 2 - cx * scale,
+                padTop + (height - padTop - padBottom) / 2 - cy * scale
+            )
+            .scale(scale);
+    }
+
+    /* ============================================
+       Отрисовка
+       ============================================ */
+
+    function addGradient(defs, id, color1, color2) {
+        var gradient = defs.append('linearGradient')
+            .attr('id', id)
+            .attr('x1', '0%').attr('y1', '0%')
+            .attr('x2', '100%').attr('y2', '100%');
+        gradient.append('stop').attr('offset', '0%').attr('stop-color', color1);
+        gradient.append('stop').attr('offset', '100%').attr('stop-color', color2);
+    }
+
+    function renderGraph(graphData, topicName, options) {
+        options = options || {};
+        var container = document.getElementById('graph-container');
+        if (!container) return;
+        if (!graphData || !graphData.nodes || !graphData.nodes.length) {
+            container.innerHTML = '';
+            return;
+        }
+
+        var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var animate = options.animate !== false && !reduceMotion;
+
+        clearTimers();
+        if (highlightTimer) { clearTimeout(highlightTimer); highlightTimer = null; }
+
+        container.innerHTML = '';
+        if (typeof ModalManager !== 'undefined' && ModalManager.setTopic) {
+            ModalManager.setTopic(topicName);
+        }
+
+        var width = container.clientWidth || window.innerWidth;
+        var height = container.clientHeight || window.innerHeight;
+
+        var root = buildTree(graphData.nodes, graphData.edges || []);
+        var layout = layoutAll(root);
+        var nodes = layout.nodes;
+        var depths = layout.depths;
+
+        var links = [];
+        nodes.forEach(function (node) {
+            if (!node.parent) return;
+            links.push({
+                source: node.parent,
+                target: node,
+                color: node.branch || BRANCH_COLORS[0]
+            });
+        });
+
+        var styles = getComputedStyle(document.documentElement);
+        var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        var isDark = theme !== 'light' && theme !== 'sand';
+        var textColor = cssVar(styles, '--c-text', '#e0e0e0');
+        var secondaryColor = cssVar(styles, '--c-secondary', '#888888');
+        var softColor = cssVar(styles, '--c-muted', '#777777');
+        var strongColor = cssVar(styles, '--c-secondary-strong', '#999999');
+        var themeAccent = cssVar(styles, '--c-accent', '#e0e0e0');
+
+        var svg = d3.select(container).append('svg')
+            .attr('width', width)
+            .attr('height', height)
+            .attr('viewBox', '0 0 ' + width + ' ' + height);
+
+        var defs = svg.append('defs');
+
+        // Мягкая тень карточек
+        var shadow = defs.append('filter')
+            .attr('id', 'kg-node-shadow')
+            .attr('x', '-40%').attr('y', '-40%')
+            .attr('width', '180%').attr('height', '180%');
+        shadow.append('feDropShadow')
+            .attr('dx', 0).attr('dy', 4).attr('stdDeviation', 7)
+            .attr('flood-color', '#000000')
+            .attr('flood-opacity', isDark ? 0.5 : 0.16);
+
+        addGradient(defs, 'kg-grad-root',
+            cssVar(styles, '--c-subtle', '#1a1a1a'),
+            cssVar(styles, '--c-card', '#101010'));
+        addGradient(defs, 'kg-grad-chapter',
+            cssVar(styles, '--c-card', '#141414'),
+            cssVar(styles, '--c-panel', '#0e0e0e'));
+        addGradient(defs, 'kg-grad-pill',
+            cssVar(styles, '--c-subtle', '#1a1a1a'),
+            cssVar(styles, '--c-card', '#111111'));
+
+        var graphGroup = svg.append('g').attr('class', 'graph-root');
+        var userInteracted = false;
+        var zoomBehavior = d3.zoom()
+            .scaleExtent([0.12, 2.6])
+            .on('zoom', function (event) {
+                graphGroup.attr('transform', event.transform);
+                if (event.sourceEvent) userInteracted = true;
+            });
+        svg.call(zoomBehavior);
+        svg.on('dblclick.zoom', null);
+
+        current = {
+            data: graphData,
+            topic: topicName,
+            svg: svg,
+            zoom: zoomBehavior,
+            group: graphGroup,
+            nodes: nodes,
+            links: links,
+            fit: null,
+            rootTransform: null,
+            timers: []
+        };
+
+        /* ---------- Связи ---------- */
+
+        function startX(link, index) {
+            var source = link.source;
+            var siblings = source.children;
+            if (siblings.length <= 1) return source.tx;
+            var span = Math.min(source.spec.width * 0.62, (siblings.length - 1) * 70);
+            var step = siblings.length > 1 ? span / (siblings.length - 1) : 0;
+            return source.tx - span / 2 + step * index;
+        }
+
+        links.forEach(function (link, index) {
+            link.sx = startX(link, link.source.children.indexOf(link.target));
+            link.sy = link.source.ty + link.source.spec.height / 2 + 0.5;
+            link.tx = link.target.tx;
+            link.ty = link.target.ty - link.target.spec.height / 2 - 0.5;
+            var curve = Math.max(24, (link.ty - link.sy) * 0.48);
+            link.path = 'M ' + round(link.sx) + ' ' + round(link.sy) +
+                ' C ' + round(link.sx) + ' ' + round(link.sy + curve) +
+                ', ' + round(link.tx) + ' ' + round(link.ty - curve) +
+                ', ' + round(link.tx) + ' ' + round(link.ty);
+            link.index = index;
+        });
+
+        var linkLayer = graphGroup.append('g').attr('class', 'links-layer');
+        var linkGroups = linkLayer.selectAll('g.graph-link-group')
+            .data(links)
+            .enter()
+            .append('g')
+            .attr('class', 'graph-link-group')
+            .attr('opacity', animate ? 0 : 1);
+
+        linkGroups.append('path')
+            .attr('class', 'graph-link')
+            .attr('d', function (link) { return link.path; })
+            .attr('stroke', function (link) { return link.color; })
+            .attr('stroke-width', function (link) {
+                return link.source.depth === 0 ? 2.1 : 1.35;
+            })
+            .attr('stroke-opacity', function (link) {
+                if (link.source.depth === 0) return isDark ? 0.85 : 0.9;
+                return isDark ? 0.55 : 0.7;
+            });
+
+        /* ---------- Узлы ---------- */
+
+        var nodeLayer = graphGroup.append('g').attr('class', 'nodes-layer');
+        var nodeSelection = nodeLayer.selectAll('g.knowledge-node')
+            .data(nodes, function (node) { return node.id; })
+            .enter()
+            .append('g')
+            .attr('class', 'knowledge-node')
+            .attr('transform', function (node) {
+                return 'translate(' + round(node.tx) + ',' + round(node.ty) + ')';
+            })
+            .attr('tabindex', 0)
+            .attr('role', 'button')
+            .attr('aria-label', function (node) { return node.label; });
+
+        var inner = nodeSelection.append('g')
+            .attr('class', 'node-inner')
+            .attr('opacity', animate ? 0 : 1)
+            .attr('transform', animate
+                ? function (node) { return node.depth === 0 ? 'translate(0,18) scale(0.94)' : 'translate(0,12)'; }
+                : 'translate(0,0)');
+
+        nodeSelection.each(function (node) {
+            var group = d3.select(this);
+            var spec = node.spec;
+            var isRoot = node.depth === 0;
+            var branchColor = node.branch || strongColor;
+
+            group.append('rect')
+                .attr('class', 'node-card-rect')
+                .attr('width', spec.width)
+                .attr('height', spec.height)
+                .attr('x', -spec.width / 2)
+                .attr('y', -spec.height / 2)
+                .attr('rx', spec.rx)
+                .attr('ry', spec.rx)
+                .attr('fill', function () {
+                    if (isRoot) return 'url(#kg-grad-root)';
+                    return node.depth === 1 ? 'url(#kg-grad-chapter)' : 'url(#kg-grad-pill)';
+                })
+                .attr('stroke', isRoot ? strongColor : branchColor)
+                .attr('stroke-opacity', isRoot ? 0.65 : (isDark ? 0.6 : 0.72))
+                .attr('stroke-width', isRoot ? 1.6 : (node.depth === 1 ? 1.35 : 1.15))
+                .attr('filter', 'url(#kg-node-shadow)');
+
+            // Цветная метка ветки
+            if (spec.shape === 'rect') {
+                group.append('rect')
+                    .attr('class', 'node-accent-bar')
+                    .attr('width', 34)
+                    .attr('height', 3)
+                    .attr('rx', 1.5)
+                    .attr('x', -17)
+                    .attr('y', spec.barY)
+                    .attr('fill', isRoot ? themeAccent : branchColor)
+                    .attr('opacity', isRoot ? 0.75 : 0.9);
+            }
+
+            if (isRoot || node.depth === 1) {
+                spec.titleLines.forEach(function (line, index) {
+                    group.append('text')
+                        .attr('class', 'node-card-title')
+                        .text(line)
+                        .attr('text-anchor', 'middle')
+                        .attr('x', 0)
+                        .attr('y', spec.titleBaselines[index] || 0)
+                        .attr('font-size', spec.titleSize.toFixed(2) + 'px')
+                        .attr('fill', textColor);
+                });
+
+                if (spec.desc) {
+                    group.append('text')
+                        .attr('class', 'node-card-desc')
+                        .text(spec.desc)
+                        .attr('text-anchor', 'middle')
+                        .attr('x', 0)
+                        .attr('y', spec.descBaseline)
+                        .attr('font-size', spec.descSize.toFixed(2) + 'px')
+                        .attr('fill', secondaryColor);
+                }
+
+                // Сложность и время
+                var difficulty = clamp(Number(node.difficulty) || 3, 1, 5);
+                var footY = spec.footY;
+                var startDotX = -spec.width / 2 + 14;
+                for (var dot = 0; dot < 5; dot++) {
+                    group.append('circle')
+                        .attr('class', 'node-diff-dot')
+                        .attr('cx', startDotX + dot * 9)
+                        .attr('cy', footY)
+                        .attr('r', 2.4)
+                        .attr('fill', dot < difficulty ? difficultyColor(difficulty) : cssVar(styles, '--c-subtle', '#262626'));
+                }
+                if (node.time) {
+                    group.append('text')
+                        .attr('class', 'node-card-time')
+                        .text(ellipsize(node.time, 80, 9 * fontScale(), 400))
+                        .attr('text-anchor', 'end')
+                        .attr('x', spec.width / 2 - 14)
+                        .attr('y', footY + 3.4)
+                        .attr('font-size', (9 * fontScale()).toFixed(2) + 'px')
+                        .attr('fill', softColor);
+                }
+            } else {
+                // Подтема: овальная пилюля
+                group.append('circle')
+                    .attr('class', 'node-pill-dot')
+                    .attr('cx', -spec.width / 2 + 18)
+                    .attr('cy', 0)
+                    .attr('r', 3.4)
+                    .attr('fill', difficultyColor(node.difficulty))
+                    .attr('opacity', 0.95);
+
+                group.append('text')
+                    .attr('class', 'node-card-title')
+                    .text(spec.titleLines[0] || '')
+                    .attr('text-anchor', 'middle')
+                    .attr('x', 5)
+                    .attr('y', 0)
+                    .attr('dominant-baseline', 'central')
+                    .attr('font-size', spec.titleSize.toFixed(2) + 'px')
+                    .attr('fill', textColor);
+            }
+        });
+
+        /* ---------- Контакты связей (поверх карточек) ---------- */
+
+        var portLayer = graphGroup.append('g').attr('class', 'ports-layer');
+        var portGroups = portLayer.selectAll('g.graph-port-group')
+            .data(links)
+            .enter()
+            .append('g')
+            .attr('class', 'graph-port-group')
+            .attr('opacity', animate ? 0 : 0.95);
+
+        portGroups.append('circle')
+            .attr('class', 'graph-link-port')
+            .attr('cx', function (link) { return link.sx; })
+            .attr('cy', function (link) { return link.sy; })
+            .attr('r', 2.6)
+            .attr('fill', function (link) { return link.color; });
+
+        portGroups.append('circle')
+            .attr('class', 'graph-link-port')
+            .attr('cx', function (link) { return link.tx; })
+            .attr('cy', function (link) { return link.ty; })
+            .attr('r', 3.2)
+            .attr('fill', function (link) { return link.color; });
+
+        /* ---------- Взаимодействие ---------- */
+
+        function clearHighlight() {
+            nodeSelection.classed('dimmed', false).classed('highlighted', false);
+            linkGroups.classed('dimmed', false);
+            portGroups.classed('dimmed', false);
+        }
+
+        function highlightNode(nodeId) {
+            var connected = {};
+            connected[nodeId] = true;
+            links.forEach(function (link) {
+                if (link.source.id === nodeId) connected[link.target.id] = true;
+                if (link.target.id === nodeId) connected[link.source.id] = true;
+            });
+            nodeSelection
+                .classed('dimmed', function (node) { return !connected[node.id]; })
+                .classed('highlighted', function (node) { return node.id === nodeId; });
+            linkGroups.classed('dimmed', function (link) {
+                return link.source.id !== nodeId && link.target.id !== nodeId;
+            });
+            portGroups.classed('dimmed', function (link) {
+                return link.source.id !== nodeId && link.target.id !== nodeId;
+            });
+        }
+
+        function openNode(node) {
+            if (typeof ModalManager !== 'undefined' && ModalManager.openModal) {
+                ModalManager.openModal(node, graphData);
+            }
+        }
+
+        var pointerStart = null;
+        nodeSelection
+            .on('pointerdown', function (event) {
+                pointerStart = { x: event.clientX, y: event.clientY };
+            })
+            .on('click', function (event, node) {
+                var moved = pointerStart && (
+                    Math.abs(event.clientX - pointerStart.x) > 5 ||
+                    Math.abs(event.clientY - pointerStart.y) > 5
+                );
+                pointerStart = null;
+                if (moved) return;
+                event.stopPropagation();
+                openNode(node);
+            })
+            .on('keydown', function (event, node) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openNode(node);
+                }
+            })
+            .on('mouseenter', function (event, node) {
+                highlightNode(node.id);
+            })
+            .on('mouseleave', clearHighlight);
+
+        svg.on('dblclick', function (event) {
+            if (event.target.closest && event.target.closest('.knowledge-node')) return;
+            fitToScreen(false);
+        });
+
+        /* ---------- Анимации ---------- */
+
+        var delayByDepth = {};
+        var maxDelay = 0;
+        depths.forEach(function (row, depth) {
+            row.forEach(function (node, index) {
+                if (depth === 0) {
+                    node.delay = 60;
+                } else if (depth === 1) {
+                    node.delay = 280 + index * 70;
+                } else {
+                    node.delay = 520 + (depth - 2) * 240 + index * 45;
+                }
+                maxDelay = Math.max(maxDelay, node.delay);
+            });
+        });
+
+        function linkDelay(link) {
+            var siblings = link.source.children;
+            var index = siblings.indexOf(link.target);
+            var base = 380 + link.source.depth * 240;
+            return base + Math.max(0, index) * 40;
+        }
+
+        if (animate) {
+            // Камера сразу показывает первую плитку
+            svg.call(zoomBehavior.transform, rootTransform(root, width));
+
+            inner.transition('kg-node-enter')
+                .delay(function (node) { return node.delay; })
+                .duration(function (node) { return node.depth === 0 ? 620 : 480; })
+                .ease(d3.easeCubicOut)
+                .attr('opacity', 1)
+                .attr('transform', 'translate(0,0) scale(1)');
+
+            linkGroups.each(function (link) {
+                var group = d3.select(this);
+                var path = group.select('.graph-link');
+                var pathNode = path.node();
+                if (pathNode && pathNode.getTotalLength) {
+                    var length = pathNode.getTotalLength();
+                    path.attr('stroke-dasharray', length).attr('stroke-dashoffset', length);
+                }
+                var delay = linkDelay(link);
+                group.transition('kg-link-enter')
+                    .delay(delay)
+                    .duration(240)
+                    .attr('opacity', 1);
+                path.transition('kg-link-draw')
+                    .delay(delay)
+                    .duration(520)
+                    .ease(d3.easeQuadOut)
+                    .attr('stroke-dashoffset', 0)
+                    .on('end', function () {
+                        d3.select(this).attr('stroke-dasharray', null);
+                    });
+            });
+
+            portGroups.transition('kg-port-enter')
+                .delay(function (link) { return linkDelay(link) + 240; })
+                .duration(260)
+                .attr('opacity', 0.95);
+
+            later(function () {
+                if (!current || userInteracted) return;
+                var modalOpen = document.querySelector('.modal-overlay:not(.hidden)');
+                if (modalOpen) return;
+                // На узких экранах не уменьшаем дерево до нечитаемого размера:
+                // камера остаётся на корне, дальше можно двигать и масштабировать.
+                var fit = fitTransform(nodes, width, height);
+                if (width < 700 || fit.k < 0.55) return;
+                fitToScreen(true);
+            }, Math.max(1500, maxDelay + 760));
+        } else {
+            var fit = fitTransform(nodes, width, height);
+            if (width < 700 || fit.k < 0.55) {
+                svg.call(zoomBehavior.transform, rootTransform(root, width));
+            } else {
+                svg.call(zoomBehavior.transform, fit);
+            }
+        }
+    }
+
+    /* ============================================
+       Публичные действия
+       ============================================ */
+
+    function fitToScreen(instant) {
+        if (!current || !current.svg || !current.zoom) return;
+        var container = document.getElementById('graph-container');
+        if (!container) return;
+        var width = container.clientWidth || window.innerWidth;
+        var height = container.clientHeight || window.innerHeight;
+        var transform = fitTransform(current.nodes, width, height);
+        if (instant) {
+            current.svg.call(current.zoom.transform, transform);
+        } else {
+            current.svg.transition('kg-fit')
+                .duration(720)
+                .ease(d3.easeCubicInOut)
+                .call(current.zoom.transform, transform);
+        }
+    }
+
+    function focusRoot() {
+        if (!current || !current.svg || !current.zoom) return;
+        var container = document.getElementById('graph-container');
+        if (!container) return;
+        var width = container.clientWidth || window.innerWidth;
+        var root = current.nodes.filter(function (node) { return node.depth === 0; })[0];
+        if (!root) return;
+        var transform = rootTransform(root, width);
+        current.svg.transition('kg-focus-root')
+            .duration(650)
+            .ease(d3.easeCubicInOut)
+            .call(current.zoom.transform, transform);
+    }
+
+    // Перерисовка при изменении размера окна — без повторной анимации
     window.addEventListener('resize', function () {
         clearTimeout(resizeTimer);
         resizeTimer = setTimeout(function () {
             if (!document.getElementById('graph-container')) return;
-            if (currentGraphData) renderGraph(currentGraphData, currentTopicName);
-        }, 250);
+            if (current && current.data) {
+                renderGraph(current.data, current.topic, { animate: false });
+            }
+        }, 220);
     });
 
-    return { renderGraph: renderGraph };
+    // Подсветка связей из модального окна
+    window._graphHighlight = function (nodeId) {
+        if (!current) return;
+        var node = current.nodes.filter(function (item) { return item.id === nodeId; })[0];
+        if (!node) return;
+        var connected = {};
+        connected[nodeId] = true;
+        current.links.forEach(function (link) {
+            if (link.source.id === nodeId) connected[link.target.id] = true;
+            if (link.target.id === nodeId) connected[link.source.id] = true;
+        });
+        d3.selectAll('#graph-container .knowledge-node')
+            .classed('dimmed', function (item) { return !connected[item.id]; });
+        d3.selectAll('#graph-container .graph-link-group')
+            .classed('dimmed', function (link) {
+                return link.source.id !== nodeId && link.target.id !== nodeId;
+            });
+        d3.selectAll('#graph-container .graph-port-group')
+            .classed('dimmed', function (link) {
+                return link.source.id !== nodeId && link.target.id !== nodeId;
+            });
+        if (highlightTimer) clearTimeout(highlightTimer);
+        highlightTimer = setTimeout(function () {
+            d3.selectAll('#graph-container .knowledge-node').classed('dimmed', false);
+            d3.selectAll('#graph-container .graph-link-group').classed('dimmed', false);
+            d3.selectAll('#graph-container .graph-port-group').classed('dimmed', false);
+        }, 3000);
+    };
+
+    return {
+        renderGraph: renderGraph,
+        fit: fitToScreen,
+        focusRoot: focusRoot
+    };
 })();

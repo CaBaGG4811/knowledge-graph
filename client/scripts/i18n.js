@@ -95,6 +95,7 @@ const I18n = (function () {
             graphSave: 'Сохранить',
             graphSearch: 'Поиск узла…',
             graphSearchEmpty: 'Ничего не найдено',
+            graphFit: 'Показать всё',
 
             // Settings
             settingsTitle: 'Настройки',
@@ -250,6 +251,7 @@ const I18n = (function () {
             graphSave: 'Save',
             graphSearch: 'Search node…',
             graphSearchEmpty: 'Nothing found',
+            graphFit: 'Fit to screen',
 
             settingsTitle: 'Settings',
             settingsBack: 'Back',
@@ -403,6 +405,7 @@ const I18n = (function () {
             graphSave: '保存',
             graphSearch: '搜索节点…',
             graphSearchEmpty: '未找到',
+            graphFit: '适应屏幕',
 
             settingsTitle: '设置',
             settingsBack: '返回',
@@ -556,6 +559,7 @@ const I18n = (function () {
             graphSave: 'Guardar',
             graphSearch: 'Buscar nodo…',
             graphSearchEmpty: 'Nada encontrado',
+            graphFit: 'Ajustar a pantalla',
 
             settingsTitle: 'Configuración',
             settingsBack: 'Volver',
@@ -709,6 +713,7 @@ const I18n = (function () {
             graphSave: 'सहेजें',
             graphSearch: 'नोड खोजें…',
             graphSearchEmpty: 'कुछ नहीं मिला',
+            graphFit: 'स्क्रीन में फ़िट करें',
 
             settingsTitle: 'सेटिंग्स',
             settingsBack: 'वापस',
@@ -862,6 +867,7 @@ const I18n = (function () {
             graphSave: 'حفظ',
             graphSearch: 'بحث عن عقدة…',
             graphSearchEmpty: 'لا شيء',
+            graphFit: 'ملاءمة الشاشة',
 
             settingsTitle: 'الإعدادات',
             settingsBack: 'رجوع',
