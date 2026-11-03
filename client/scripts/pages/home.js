@@ -9,6 +9,9 @@ const HomePage = (function () {
     var ghostTimer = null;
     var _docClickHandlers = [];
 
+    // Текущий открытый граф: переживёт уход в настройки и вернёт пользователя на карту
+    var activeGraph = null;
+
     var topicSuggestions = [
         { group: 'Физика', items: ['Квантовая физика', 'Термодинамика', 'Электромагнетизм', 'Астрофизика'] },
         { group: 'Информатика', items: ['Машинное обучение', 'Алгоритмы и структуры данных', 'Нейронные сети', 'Кибербезопасность'] },
@@ -23,6 +26,11 @@ const HomePage = (function () {
     ];
 
     function render() {
+        // возвращаемся из настроек: восстанавливаем карту, а не главную
+        if (activeGraph) {
+            showGraph(activeGraph.data, activeGraph.topic, { restore: true });
+            return;
+        }
         document.body.style.overflow = 'hidden';
         var t = I18n.t;
         var content = document.getElementById('app-content');
@@ -53,8 +61,15 @@ const HomePage = (function () {
                             </div>
                         </div>
                     </div>
-                    <div class="sidebar-list" id="sidebar-list">
-                        <div class="sidebar-empty">${t('historyEmpty')}</div>
+                    <button class="side-btn open" id="side-nodes-btn" title="${t('menuAllNodes')}">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="12" cy="13" r="2.2"/><path d="M5 7.2v1.3a2 2 0 002 2h2.8"/><path d="M19 7.2v1.3a2 2 0 01-2 2h-2.8"/><path d="M12 15.2v6.3"/></svg>
+                        <span>${t('menuAllNodes')}</span>
+                        <svg class="side-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                    <div class="side-nodes-panel" id="side-nodes-panel">
+                        <div class="sidebar-list" id="sidebar-list">
+                            <div class="sidebar-empty">${t('historyEmpty')}</div>
+                        </div>
                     </div>
                     <div class="sidebar-footer">
                         <button class="sidebar-settings-btn" id="sidebar-settings">
@@ -166,6 +181,15 @@ const HomePage = (function () {
             panel.classList.toggle('hidden');
             libraryBtn.classList.toggle('open', willOpen);
             if (willOpen) loadLibrary();
+        });
+
+        // ——— боковая панель: все узлы (сворачиваемая секция) ———
+        var nodesBtn = document.getElementById('side-nodes-btn');
+        nodesBtn.addEventListener('click', function () {
+            var panel = document.getElementById('side-nodes-panel');
+            var willOpen = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden');
+            nodesBtn.classList.toggle('open', willOpen);
         });
 
         var track = document.getElementById('side-library-track');
@@ -805,11 +829,62 @@ const HomePage = (function () {
     }
 
     /* ============================================
+       Диалог выхода с карты
+       ============================================ */
+
+    function exitDialog(onExit, onSave) {
+        var t = I18n.t;
+        var overlay = document.createElement('div');
+        overlay.className = 'ask-overlay pending';
+        overlay.innerHTML =
+            '<div class="ask-backdrop"></div>' +
+            '<div class="ask-modal">' +
+                '<div class="ask-title">' + escapeHtml(t('exitTitle')) + '</div>' +
+                '<div class="ask-desc">' + escapeHtml(t('exitDesc')) + '</div>' +
+                '<div class="ask-actions">' +
+                    '<button class="btn btn-sm" id="exit-leave">' + escapeHtml(t('exitLeaveBtn')) + '</button>' +
+                    '<button class="btn btn-primary btn-sm" id="exit-save">' + escapeHtml(t('saveTreeTitle')) + '</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+        var done = false;
+        function finish() {
+            if (done) return;
+            done = true;
+            overlay.classList.add('ask-closing');
+            setTimeout(function () { overlay.remove(); }, 160);
+        }
+        overlay.querySelector('#exit-save').addEventListener('click', function () { finish(); onSave(); });
+        overlay.querySelector('#exit-leave').addEventListener('click', function () { finish(); onExit(); });
+        overlay.querySelector('.ask-backdrop').addEventListener('click', function () { finish(); });
+        document.addEventListener('keydown', function esc(e) {
+            if (e.key === 'Escape') { finish(); document.removeEventListener('keydown', esc); }
+        });
+        requestAnimationFrame(function () { overlay.classList.remove('pending'); });
+    }
+
+    function exitToHome() {
+        activeGraph = null;
+        var container = document.getElementById('graph-container');
+        var topbar = document.getElementById('top-bar');
+        if (container) container.style.opacity = '0';
+        if (topbar) topbar.style.opacity = '0';
+        setTimeout(function () { render(); }, 300);
+    }
+
+    /* ============================================
        Graph View
        ============================================ */
 
-    function showGraph(graphData, topic) {
+    function showGraph(graphData, topic, opts) {
+        opts = opts || {};
         var t = I18n.t;
+        // newfound graph — забываем статус сохранения; при восстановлении из настроек держим как было
+        activeGraph = {
+            data: graphData,
+            topic: topic,
+            saved: opts.restore && activeGraph ? activeGraph.saved : false
+        };
         document.body.style.overflow = 'hidden';
         var content = document.getElementById('app-content');
         content.innerHTML = `
@@ -838,11 +913,20 @@ const HomePage = (function () {
         `;
 
         document.getElementById('graph-back').addEventListener('click', function () {
-            var container = document.getElementById('graph-container');
-            var topbar = document.getElementById('top-bar');
-            if (container) container.style.opacity = '0';
-            if (topbar) topbar.style.opacity = '0';
-            setTimeout(function () { render(); }, 300);
+            // уже сохранён — выходим сразу, иначе просим подтвердить дествие
+            if (activeGraph && activeGraph.saved) { exitToHome(); return; }
+            exitDialog(function () { exitToHome(); }, function () {
+                askText(t('saveTreePrompt')).then(function (name) {
+                    if (!name) return; // отменили ввод названия — остаёмся на карте
+                    API.post('/api/trees', { name: name, graph_data: graphData, topic: topic }).then(function () {
+                        Toast.show(t('saveTreeSuccess'), 'success');
+                        if (activeGraph) activeGraph.saved = true;
+                        exitToHome();
+                    }).catch(function (err) {
+                        Toast.show(err.message, 'error');
+                    });
+                });
+            });
         });
         document.getElementById('graph-fit').addEventListener('click', function () {
             GraphRenderer.fit(false);
@@ -852,6 +936,7 @@ const HomePage = (function () {
                 if (!name) return;
                 API.post('/api/trees', { name: name, graph_data: graphData, topic: topic }).then(function () {
                     Toast.show(t('saveTreeSuccess'), 'success');
+                    if (activeGraph) activeGraph.saved = true;
                 }).catch(function (err) {
                     Toast.show(err.message, 'error');
                 });
