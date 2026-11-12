@@ -137,13 +137,13 @@ body {
     font-size: calc(32px * var(--font-scale));
     font-weight: 700;
     color: var(--c-text);
-    margin-bottom: 8px;
+    margin-bottom: 12px;
     letter-spacing: -0.5px;
 }
 .auth-subtitle {
     font-size: calc(14px * var(--font-scale));
     color: var(--c-muted);
-    margin-bottom: 20px;
+    margin-bottom: 28px;
     min-height: 18px;
     transition: all 0.4s;
 }
@@ -159,6 +159,10 @@ body {
     transition: border-color 0.2s;
 }
 .home-input-row:focus-within { border-color: var(--c-faint); }
+.home-input-row .btn-primary { border-radius: 6px; }
+#home-suggest-btn { border-radius: 6px; }
+#home-suggest-btn:hover { background: var(--c-subtle); color: var(--c-text-soft); }
+#home-topic-input::placeholder { color: var(--c-muted); }
 
 /* ============================================
    Left Sidebar
@@ -235,13 +239,54 @@ body {
     font-size: calc(12px * var(--font-scale));
     color: var(--c-faint);
 }
+.sidebar-item { position: relative; }
+.sidebar-item-actions {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+    opacity: 0;
+    padding-left: 14px;
+    background: var(--c-card);
+    transition: opacity 0.15s;
+}
+.sidebar-item:hover .sidebar-item-actions,
+.sidebar-item:focus-within .sidebar-item-actions { opacity: 1; }
+.sidebar-item-action {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    color: var(--c-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.sidebar-item-action:hover { background: var(--c-subtle); color: var(--c-text); }
+.sidebar-item-action.danger:hover { color: var(--c-red); }
+.sidebar-item-action.confirm { color: var(--c-red); background: rgba(239, 68, 68, 0.12); }
+.sidebar-item-edit {
+    width: 100%;
+    font-size: calc(12px * var(--font-scale));
+    font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--c-text);
+    background: var(--c-card);
+    border: 1px solid var(--c-faint);
+    border-radius: 5px;
+    padding: 4px 8px;
+    outline: none;
+}
 
 /* Кнопки в стиле Qwen AI Studio + библиотека карточек */
 .side-menu {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 10px 8px 4px;
+    padding: 10px 8px 2px;
 }
 
 .side-btn {
@@ -266,6 +311,8 @@ body {
 .side-btn:hover svg { color: var(--c-text-soft); }
 .side-btn .side-chevron { margin-left: auto; transition: transform 0.2s; }
 .side-btn.open .side-chevron { transform: rotate(90deg); }
+.home-sidebar > .side-btn { margin: 0 8px; width: auto; align-self: stretch; }
+.side-btn.open { background: var(--c-subtle); color: var(--c-text); }
 
 /* ——— Моё творчество: карусель плиток ——— */
 .side-library-panel { padding: 4px 8px 8px; }
@@ -381,26 +428,26 @@ body {
 }
 
 .sidebar-footer {
-    padding: 12px;
+    padding: 8px 8px 12px;
     border-top: 1px solid var(--c-subtle);
 }
 
 .sidebar-settings-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--c-subtle);
-    background: var(--c-card);
-    border-radius: 6px;
-    color: var(--c-secondary);
+    padding: 9px 12px;
+    border: none;
+    background: none;
+    border-radius: 8px;
+    color: var(--c-text-soft);
     font-size: calc(12px * var(--font-scale));
     font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
     cursor: pointer;
     transition: all 0.15s;
 }
-.sidebar-settings-btn:hover { background: var(--c-subtle); color: var(--c-text); border-color: var(--c-strong); }
+.sidebar-settings-btn:hover { background: var(--c-subtle); color: var(--c-text); }
 
 /* ============================================
    Dropdown — opaque
@@ -560,10 +607,10 @@ body {
 }
 .ghost-card {
     position: absolute;
-    width: 120px;
+    width: 150px;
     padding: 10px 12px;
-    background: var(--c-panel);
-    border: 1px solid var(--c-subtle);
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
     border-radius: 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     pointer-events: none;
@@ -571,7 +618,7 @@ body {
 .ghost-card-title {
     font-size: calc(10px * var(--font-scale));
     font-weight: 500;
-    color: var(--c-dim);
+    color: var(--c-secondary);
     margin-bottom: 6px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -581,9 +628,9 @@ body {
 .ghost-card-dots span {
     width: 5px; height: 5px;
     border-radius: 50%;
-    background: var(--c-strong);
+    background: var(--c-faint);
 }
-.ghost-card-dots span:nth-child(1) { background: var(--c-faint); }
+.ghost-card-dots span:nth-child(1) { background: var(--c-muted); }
 .ghost-line {
     position: absolute;
     height: 1px;
@@ -1197,6 +1244,81 @@ select.settings-input {
 /* ============================================
    Accessibility
    ============================================ */
+/* ============================================
+   Mobile — вертикальные телефоны и планшеты
+   ============================================ */
+.mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 60;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    background: var(--c-card);
+    color: var(--c-text-soft);
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 48;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+
+/* сенсорные устройства: кнопки карточек видимы всегда */
+@media (hover: none) {
+    .sidebar-item-actions { opacity: 1; }
+}
+
+@media (max-width: 820px) {
+    .mobile-menu-btn { display: flex; }
+    .sidebar-backdrop { display: block; }
+    .home-layout.drawer-open .sidebar-backdrop { opacity: 1; pointer-events: auto; }
+
+    .home-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: min(300px, 86vw);
+        height: 100vh;
+        height: 100dvh;
+        transform: translateX(-105%);
+        transition: transform 0.25s ease;
+        box-shadow: 8px 0 32px rgba(0, 0, 0, 0.5);
+        z-index: 50;
+    }
+    .home-layout.drawer-open .home-sidebar { transform: none; }
+    .home-sidebar .side-menu { padding-top: 58px; }
+
+    .home-main { width: 100%; padding: 64px 14px 20px; box-sizing: border-box; }
+    .auth-page { padding: 0; max-width: 100%; }
+    .auth-card { max-width: 100%; }
+    .auth-title { font-size: calc(26px * var(--font-scale)); margin-bottom: 10px; }
+    .auth-subtitle { font-size: calc(13px * var(--font-scale)); margin-bottom: 22px; }
+    .home-input-row { padding: 4px; border-radius: 12px; }
+    .home-input-row .input-field { padding: 10px 12px; }
+    .home-input-row .btn-primary { padding: 10px 14px; font-size: calc(13px * var(--font-scale)); }
+    #home-suggest-btn { padding: 10px 8px; }
+
+    .app-header { padding: 10px 12px; gap: 8px; }
+    .graph-topic { max-width: 26vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+
+    .settings-page { padding: 64px 14px 24px; }
+    .modal-card { width: calc(100% - 20px); max-height: 88dvh; }
+    .toast { max-width: calc(100vw - 32px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;

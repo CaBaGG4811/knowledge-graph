@@ -25,6 +25,16 @@ router.post('/', (req, res) => {
     res.json(tree);
 });
 
+router.put('/:id', (req, res) => {
+    const tree = getOne('SELECT id FROM trees WHERE id = ?', [req.params.id]);
+    if (!tree) return res.status(404).json({ error: 'Дерево не найдено' });
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) return res.status(400).json({ error: 'Название обязательно' });
+    if (name.length > 200) return res.status(400).json({ error: 'Название слишком длинное' });
+    runQuery('UPDATE trees SET name = ? WHERE id = ?', [name, req.params.id]);
+    res.json({ ok: true, tree: getOne('SELECT id, name, topic, created_at FROM trees WHERE id = ?', [req.params.id]) });
+});
+
 router.delete('/:id', (req, res) => {
     const tree = getOne('SELECT id FROM trees WHERE id = ?', [req.params.id]);
     if (!tree) return res.status(404).json({ error: 'Дерево не найдено' });

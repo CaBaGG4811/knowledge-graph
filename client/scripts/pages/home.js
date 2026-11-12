@@ -36,6 +36,10 @@ const HomePage = (function () {
         var content = document.getElementById('app-content');
         content.innerHTML = `
             <div class="home-layout">
+                <button class="mobile-menu-btn" id="mobile-menu-btn" title="${t('openMenu')}" aria-label="${t('openMenu')}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
                 <aside class="home-sidebar" id="home-sidebar">
                     <div class="side-menu">
                         <button class="side-btn" id="side-search-btn" title="${t('menuSearchChats')}">
@@ -73,7 +77,7 @@ const HomePage = (function () {
                     </div>
                     <div class="sidebar-footer">
                         <button class="sidebar-settings-btn" id="sidebar-settings">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                             <span>${t('menuSettings')}</span>
                         </button>
                     </div>
@@ -97,7 +101,6 @@ const HomePage = (function () {
                     </div>
                 </div>
             </div>
-            <div id="ghost-canvas" class="ghost-canvas"></div>
             <div id="home-loading" class="loading-overlay hidden">
                 <div class="loading-panel">
                     <div id="home-loading-tip" class="loading-tip"></div>
@@ -110,7 +113,6 @@ const HomePage = (function () {
         bindEvents();
         startHints();
         loadSidebarHistory();
-        startGhostAnimation();
 
         // очистка при уходе со страницы (Router.runCleanups)
         Router.addCleanup(function () {
@@ -166,6 +168,21 @@ const HomePage = (function () {
 
         document.getElementById('sidebar-settings').addEventListener('click', function () {
             window.location.hash = '#/settings';
+        });
+
+        // ——— мобильное выдвижное меню ———
+        var layoutEl = document.querySelector('.home-layout');
+        function closeDrawer() { if (layoutEl) layoutEl.classList.remove('drawer-open'); }
+        var burger = document.getElementById('mobile-menu-btn');
+        if (burger) burger.addEventListener('click', function (e) {
+            e.stopPropagation();
+            layoutEl.classList.toggle('drawer-open');
+        });
+        var backdropEl = document.getElementById('sidebar-backdrop');
+        if (backdropEl) backdropEl.addEventListener('click', closeDrawer);
+        var drawerSidebar = document.getElementById('home-sidebar');
+        if (drawerSidebar) drawerSidebar.addEventListener('click', function (e) {
+            if (e.target.closest('.sidebar-item, .sidebar-settings-btn, #side-search-btn')) closeDrawer();
         });
 
         // ——— боковая панель: поиск чатов ———
@@ -533,22 +550,89 @@ const HomePage = (function () {
                 return;
             }
             listEl.innerHTML = '';
-            data.trees.slice().reverse().forEach(function (tree, idx) {
-                var item = document.createElement('button');
+            data.trees.forEach(function (tree, idx) {
+                var item = document.createElement('div');
                 item.className = 'sidebar-item';
                 item.style.animation = 'item-in 0.28s ease backwards';
                 item.style.animationDelay = (Math.min(idx, 12) * 0.04) + 's';
                 var dateStr = tree.created_at ? new Date(tree.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : '';
                 var iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>';
+                var pencilSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+                var trashSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>';
                 item.innerHTML = '<div class="sidebar-item-icon">' + iconSvg + '</div>' +
                     '<div class="sidebar-item-info"><span class="sidebar-item-name">' + escapeHtml(tree.name || tree.topic || '—') + '</span>' +
-                    (dateStr ? '<span class="sidebar-item-date">' + escapeHtml(dateStr) + '</span>' : '') + '</div>';
+                    (dateStr ? '<span class="sidebar-item-date">' + escapeHtml(dateStr) + '</span>' : '') + '</div>' +
+                    '<div class="sidebar-item-actions">' +
+                    '<span class="sidebar-item-action" data-act="rename" title="' + escapeHtml(t('treeRename')) + '">' + pencilSvg + '</span>' +
+                    '<span class="sidebar-item-action danger" data-act="delete" title="' + escapeHtml(t('treeDelete')) + '">' + trashSvg + '</span>' +
+                    '</div>';
                 item.addEventListener('click', function () {
                     try {
                         var gd = typeof tree.graph_data === 'string' ? JSON.parse(tree.graph_data) : tree.graph_data;
                         showGraph(gd, tree.topic || tree.name);
                     } catch (e) { Toast.show(t('loadError'), 'error'); }
                 });
+
+                var infoEl = item.querySelector('.sidebar-item-info');
+
+                function startRename(ev) {
+                    ev.stopPropagation();
+                    var current = tree.name || tree.topic || '';
+                    var input = document.createElement('input');
+                    input.className = 'sidebar-item-edit';
+                    input.value = current;
+                    infoEl.innerHTML = '';
+                    infoEl.appendChild(input);
+                    input.focus();
+                    input.select();
+                    var done = false;
+                    function finish(save) {
+                        if (done) return;
+                        done = true;
+                        var value = input.value.trim();
+                        if (save && value && value !== current) {
+                            API.put('/api/trees/' + tree.id, { name: value }).then(function () {
+                                loadSidebarHistory();
+                            }).catch(function (err) {
+                                Toast.show(t('errorPrefix') + err.message, 'error');
+                                loadSidebarHistory();
+                            });
+                        } else {
+                            loadSidebarHistory();
+                        }
+                    }
+                    input.addEventListener('click', function (e) { e.stopPropagation(); });
+                    input.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+                        else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+                    });
+                    input.addEventListener('blur', function () { finish(true); });
+                }
+
+                var deleteArmed = false;
+                var deleteTimer = null;
+
+                item.querySelector('[data-act="rename"]').addEventListener('click', startRename);
+                item.querySelector('[data-act="delete"]').addEventListener('click', function (ev) {
+                    ev.stopPropagation();
+                    var btn = ev.currentTarget;
+                    if (!deleteArmed) {
+                        deleteArmed = true;
+                        btn.classList.add('confirm');
+                        deleteTimer = setTimeout(function () {
+                            deleteArmed = false;
+                            btn.classList.remove('confirm');
+                        }, 4000);
+                        return;
+                    }
+                    if (deleteTimer) { clearTimeout(deleteTimer); deleteTimer = null; }
+                    API.del('/api/trees/' + tree.id).then(function () {
+                        item.remove();
+                    }).catch(function (err) {
+                        Toast.show(t('errorPrefix') + err.message, 'error');
+                    });
+                });
+
                 listEl.appendChild(item);
             });
         } catch (err) {
@@ -573,20 +657,20 @@ const HomePage = (function () {
 
             var count = 3;
             var topBand = Math.random() < 0.5;
-            var baseX = sidebarW + 40 + Math.random() * Math.max(20, availW - 480);
-            baseX = Math.max(sidebarW + 20, Math.min(baseX, w - 460));
+            var baseX = sidebarW + 40 + Math.random() * Math.max(20, availW - 520);
+            baseX = Math.max(sidebarW + 20, Math.min(baseX, w - 520));
             var baseY = topBand
                 ? 30 + Math.random() * Math.max(40, h * 0.18)
                 : Math.min(h - 90, h * 0.82 + Math.random() * Math.max(20, h * 0.1));
-            var topic = ghostTopics[Math.floor(Math.random() * ghostTopics.length)];
+            var topicIndex = Math.floor(Math.random() * ghostTopics.length);
 
             var cards = [];
             for (var i = 0; i < count; i++) {
                 var card = document.createElement('div');
                 card.className = 'ghost-card';
-                var cx = baseX + (i % 3) * 140 + (Math.random() - 0.5) * 60;
-                var cy = baseY + Math.floor(i / 3) * 80 + (Math.random() - 0.5) * 40;
-                var label = i === 0 ? topic : topic.substring(0, 12) + '...';
+                var cx = baseX + (i % 3) * 170 + (Math.random() - 0.5) * 20;
+                var cy = baseY + Math.floor(i / 3) * 80 + (Math.random() - 0.5) * 24;
+                var label = ghostTopics[(topicIndex + i * 3) % ghostTopics.length];
                 card.style.left = cx + 'px';
                 card.style.top = cy + 'px';
                 card.innerHTML = '<div class="ghost-card-title">' + label + '</div>' +
@@ -601,9 +685,9 @@ const HomePage = (function () {
             for (var j = 0; j < cards.length - 1; j++) {
                 var line = document.createElement('div');
                 line.className = 'ghost-line';
-                var x1 = cards[j].x + 60;
+                var x1 = cards[j].x + 75;
                 var y1 = cards[j].y + 25;
-                var x2 = cards[j + 1].x + 60;
+                var x2 = cards[j + 1].x + 75;
                 var y2 = cards[j + 1].y + 25;
                 var dx = x2 - x1;
                 var dy = y2 - y1;
@@ -630,7 +714,7 @@ const HomePage = (function () {
                     cards.forEach(function (c, i) {
                         var delay = i * 120;
                         var cp = Math.max(0, Math.min(1, (p * totalDuration * 0.3 - delay) / 400));
-                        c.el.style.opacity = 0.55 * cp;
+                        c.el.style.opacity = 0.75 * cp;
                         c.el.style.transform = 'scale(' + (0.8 + 0.2 * cp) + ') translateY(' + (20 * (1 - cp)) + 'px)';
                     });
                 } else if (progress < 0.5) {
@@ -638,14 +722,14 @@ const HomePage = (function () {
                     lines.forEach(function (l, i) {
                         var delay = i * 150;
                         var cp = Math.max(0, Math.min(1, (lp * 2000 - delay) / 500));
-                        l.style.opacity = cp * 0.2;
+                        l.style.opacity = cp * 0.3;
                     });
                 } else if (progress < 0.85) {
                     cards.forEach(function (c) {
-                        c.el.style.opacity = '0.55';
+                        c.el.style.opacity = '0.75';
                         c.el.style.transform = 'scale(1) translateY(0)';
                     });
-                    lines.forEach(function (l) { l.style.opacity = '0.2'; });
+                    lines.forEach(function (l) { l.style.opacity = '0.3'; });
                 } else {
                     var fp = (progress - 0.85) / 0.15;
                     cards.forEach(function (c, i) {
@@ -655,7 +739,7 @@ const HomePage = (function () {
                         c.el.style.transform = 'scale(' + (1 - 0.15 * cp) + ') translateY(' + (-15 * cp) + 'px)';
                     });
                     lines.forEach(function (l) {
-                        l.style.opacity = 0.2 * (1 - fp);
+                        l.style.opacity = 0.3 * (1 - fp);
                     });
                 }
 
@@ -740,7 +824,6 @@ const HomePage = (function () {
             Toast.show(msg, 'error');
             subtitle.textContent = t('homeSubtitle');
             startHints();
-            startGhostAnimation();
         }
 
         try {
@@ -894,7 +977,7 @@ const HomePage = (function () {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                         ${t('graphBack')}
                     </button>
-                    <span style="font-size:13px; color:var(--text-secondary); font-weight:500;">${escapeHtml(topic)}</span>
+                    <span class="graph-topic" style="font-size:13px; color:var(--text-secondary); font-weight:500;">${escapeHtml(topic)}</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <button class="btn btn-sm" id="graph-fit" title="${t('graphFit')}" aria-label="${t('graphFit')}">
