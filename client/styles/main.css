@@ -1327,3 +1327,72 @@ select.settings-input {
     }
     .ghost-canvas { display: none !important; }
 }
+
+
+/* ============================================
+   Прогресс освоения + «Проверь меня»
+   ============================================ */
+.modal-learned-row { margin-top: 10px; }
+.modal-learned-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--c-border);
+    border-radius: 999px;
+    background: none;
+    color: var(--c-secondary);
+    font-size: calc(11px * var(--font-scale));
+    font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.modal-learned-btn:hover { border-color: var(--c-faint); color: var(--c-text); }
+.modal-learned-btn.active { border-color: var(--c-green); color: var(--c-green); background: rgba(34, 197, 94, 0.08); }
+
+.graph-progress {
+    font-size: calc(11px * var(--font-scale));
+    color: var(--c-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.knowledge-node.learned .node-card-rect {
+    stroke: var(--c-green);
+    stroke-opacity: 0.95;
+    stroke-width: 1.9;
+}
+.learned-badge { opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+.knowledge-node.learned .learned-badge { opacity: 1; }
+.learned-badge-circle { fill: var(--c-green); }
+.learned-badge-check { fill: none; stroke: #ffffff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.exam-loading { color: var(--c-secondary); font-size: calc(13px * var(--font-scale)); }
+.exam-progress { font-size: calc(11px * var(--font-scale)); color: var(--c-secondary); margin-bottom: 10px; font-variant-numeric: tabular-nums; }
+.exam-question {
+    font-size: calc(15px * var(--font-scale));
+    font-weight: 600;
+    color: var(--c-text);
+    margin-bottom: 16px;
+    line-height: 1.45;
+}
+.exam-options { display: flex; flex-direction: column; gap: 8px; }
+.exam-option {
+    text-align: left;
+    padding: 10px 14px;
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    background: var(--c-panel);
+    color: var(--c-text-soft);
+    font-size: calc(13px * var(--font-scale));
+    font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.exam-option:hover:not(:disabled) { border-color: var(--c-faint); background: var(--c-card); }
+.exam-option.correct { border-color: var(--c-green); background: rgba(34, 197, 94, 0.12); color: var(--c-text); }
+.exam-option.wrong { border-color: var(--c-red); background: rgba(239, 68, 68, 0.10); color: var(--c-text); }
+.exam-option:disabled { cursor: default; opacity: 0.9; }
+.exam-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.exam-score { font-size: calc(34px * var(--font-scale)); font-weight: 700; color: var(--c-text); text-align: center; margin: 18px 0 6px; }
+.exam-score-label { text-align: center; color: var(--c-secondary); font-size: calc(12px * var(--font-scale)); margin-bottom: 18px; }

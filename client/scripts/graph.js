@@ -15,6 +15,7 @@ const GraphRenderer = (function () {
     var resizeTimer = null;
     var measureCtx = null;
     var highlightTimer = null;
+    var progressRefresh = null;
 
     function clamp(value, min, max) {
         return Math.min(max, Math.max(min, value));
@@ -638,6 +639,13 @@ const GraphRenderer = (function () {
                 .attr('stroke-width', isRoot ? 1.6 : (node.depth === 1 ? 1.35 : 1.15))
                 .attr('filter', 'url(#kg-node-shadow)');
 
+            if (spec.shape === 'rect') {
+                group.append('g')
+                    .attr('class', 'learned-badge')
+                    .attr('transform', 'translate(' + (spec.width / 2 - 10) + ',' + (-spec.height / 2 + 10) + ')')
+                    .html('<circle class="learned-badge-circle" r="9"></circle><path class="learned-badge-check" d="M-4.2 0.2 L-1.3 3.4 L4.6 -3.6"></path>');
+            }
+
             // Цветная метка ветки
             if (spec.shape === 'rect') {
                 group.append('rect')
@@ -717,6 +725,14 @@ const GraphRenderer = (function () {
                     .attr('fill', textColor);
             }
         });
+
+        // Прогресс освоения: подсветка изученных узлов
+        progressRefresh = function () {
+            if (!current || !current.nodes) return;
+            var map = (typeof Progress !== 'undefined') ? Progress.getMap(current.topic) : {};
+            d3.selectAll('#graph-container .knowledge-node').classed('learned', function (item) { return !!map[item.id]; });
+        };
+        progressRefresh();
 
         /* ---------- Контакты связей (поверх карточек) ---------- */
 
@@ -932,6 +948,11 @@ const GraphRenderer = (function () {
                 renderGraph(current.data, current.topic, { animate: false });
             }
         }, 220);
+    });
+
+    // Прогресс освоения: обновление по событию из модалки карточки
+    document.addEventListener('kg-progress-changed', function () {
+        if (progressRefresh) progressRefresh();
     });
 
     // Подсветка связей из модального окна

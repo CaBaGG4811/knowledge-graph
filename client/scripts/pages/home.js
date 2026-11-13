@@ -980,6 +980,11 @@ const HomePage = (function () {
                     <span class="graph-topic" style="font-size:13px; color:var(--text-secondary); font-weight:500;">${escapeHtml(topic)}</span>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="graph-progress" id="graph-progress"></span>
+                    <button class="btn btn-sm" id="graph-exam" title="${t('examBtn')}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        <span>${t('examBtn')}</span>
+                    </button>
                     <button class="btn btn-sm" id="graph-fit" title="${t('graphFit')}" aria-label="${t('graphFit')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 9 4 4 9 4"/><polyline points="20 9 20 4 15 4"/><polyline points="4 15 4 20 9 20"/><polyline points="20 15 20 20 15 20"/></svg>
                     </button>
@@ -1010,6 +1015,27 @@ const HomePage = (function () {
                     });
                 });
             });
+        });
+        window.__kgProgressCtx = { topic: topic, nodes: graphData.nodes || [] };
+        function refreshProgressLabel() {
+            var span = document.getElementById('graph-progress');
+            if (!span) return;
+            var ctx = window.__kgProgressCtx;
+            var map = Progress.getMap(ctx.topic);
+            var total = ctx.nodes.length;
+            var done = ctx.nodes.filter(function (n) { return map[n.id]; }).length;
+            span.textContent = done + '/' + total + ' · ' + I18n.t('learnedShort');
+        }
+        window.__kgRefreshProgress = refreshProgressLabel;
+        refreshProgressLabel();
+        if (!window.__kgProgressBound) {
+            window.__kgProgressBound = true;
+            document.addEventListener('kg-progress-changed', function () {
+                if (window.__kgRefreshProgress) window.__kgRefreshProgress();
+            });
+        }
+        document.getElementById('graph-exam').addEventListener('click', function () {
+            ExamManager.open(topic, graphData.nodes || [], Progress.getMap(topic));
         });
         document.getElementById('graph-fit').addEventListener('click', function () {
             GraphRenderer.fit(false);

@@ -88,6 +88,8 @@ const ModalManager = (function () {
         }
         if (!leadsToHtml) leadsToHtml = '<span class="modal-dim">' + t('endOfBranch') + '</span>';
 
+        var learned = (typeof Progress !== 'undefined') && Progress.isLearned(currentTopic, nodeData.id);
+
         var card = document.getElementById('modal-card');
         card.innerHTML = `
             <button class="modal-close" id="modal-close-btn">&times;</button>
@@ -97,6 +99,12 @@ const ModalManager = (function () {
                 <div class="modal-meta-row">
                     ${difficultyBar(nodeData.difficulty || 3)}
                     ${nodeData.time ? '<span class="modal-time-badge">' + escapeHtml(nodeData.time) + '</span>' : ''}
+                </div>
+                <div class="modal-learned-row">
+                    <button class="modal-learned-btn${learned ? ' active' : ''}" id="modal-learned-btn">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span class="modal-learned-label">${t(learned ? 'learnedDone' : 'markLearned')}</span>
+                    </button>
                 </div>
             </div>
 
@@ -142,6 +150,12 @@ const ModalManager = (function () {
         `;
 
         document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+        document.getElementById('modal-learned-btn').addEventListener('click', function () {
+            var nowLearned = Progress.setLearned(currentTopic, nodeData.id);
+            this.classList.toggle('active', nowLearned);
+            this.querySelector('.modal-learned-label').textContent = I18n.t(nowLearned ? 'learnedDone' : 'markLearned');
+            document.dispatchEvent(new CustomEvent('kg-progress-changed'));
+        });
         card.querySelectorAll('.modal-action-btn').forEach(function (btn) {
             if (btn.getAttribute('data-action') === 'saveCard') {
                 btn.addEventListener('click', function () { saveCurrentCard(btn); });

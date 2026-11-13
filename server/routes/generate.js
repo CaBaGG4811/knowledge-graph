@@ -304,6 +304,7 @@ ${searchContext}
 // AI-действия
 router.post('/action', async (req, res) => {
     const { action, label, description } = req.body;
+    const topics = Array.isArray(req.body.topics) ? req.body.topics.filter(function (t) { return typeof t === 'string' && t.trim(); }).slice(0, 10) : null;
 
     const prompts = {
         detail: `Объясни подробно: «${label}». ${description || ''}. Развёрнуто, 5-8 предложений, с примерами.`,
@@ -316,7 +317,11 @@ router.post('/action', async (req, res) => {
         summary: `Конспект «${label}». Тезисы, определения, ключевые факты.`
     };
 
-    const prompt = prompts[action];
+    let prompt = prompts[action];
+    if (action === 'exam' && topics && topics.length) {
+        prompt = `Проведи мини-экзамен из 5 вопросов по понятиям: ${topics.join(', ')}. Проверяй понимание смысла, а не формулировки. 4 варианта ответа, один верный. ТОЛЬКО JSON без пояснений:
+[{"q":"Вопрос?","options":["A","B","C","D"],"correct":0}]`;
+    }
     if (!prompt) return res.status(400).json({ error: 'Неизвестное действие' });
 
     try {
@@ -328,7 +333,7 @@ router.post('/action', async (req, res) => {
         });
         var rawContent = llmResult.text;
 
-        if (action === 'quiz') {
+        if (action === 'quiz' || action === 'exam') {
             try {
                 var cleaned = rawContent.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
                 var match = cleaned.match(/\[[\s\S]*\]/);
